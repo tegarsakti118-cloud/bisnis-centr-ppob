@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SakaPay Business Center</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+  <div class="glass-blob blob-1"></div>
+  <div class="glass-blob blob-2"></div>
+
+  <!-- App Layout -->
+  <div id="app" class="app-layout">
+    
+    <!-- Overlay Sidebar -->
+    <div id="sidebar-overlay" class="sidebar-overlay" onclick="toggleSidebar()"></div>
+
+    <!-- Sidebar Kiri (Menu Pendukung) -->
+    <aside id="sidebar" class="sidebar glass-card">
+      <div class="brand">
+        <i class="fa-solid fa-wallet brand-icon"></i>
+        <div class="brand-text">
+          <span class="brand-title">SakaPay</span>
+          <span class="brand-subtitle">Menu Pendukung</span>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <a href="#debts" class="nav-link" data-page="debts">
+          <i class="fa-solid fa-book-bookmark"></i> <span>Catatan Hutang</span>
+        </a>
+        <a href="#finance" class="nav-link" data-page="finance">
+          <i class="fa-solid fa-coins"></i> <span>Finance / Keuangan</span>
+        </a>
+        <a href="#balances" class="nav-link" data-page="balances">
+          <i class="fa-solid fa-vault"></i> <span>Balance Mgmt</span>
+        </a>
+        <a href="#customers" class="nav-link" data-page="customers">
+          <i class="fa-solid fa-users"></i> <span>Customers</span>
+        </a>
+        <a href="#transactions" class="nav-link" data-page="transactions">
+          <i class="fa-solid fa-gear"></i> <span>Pengaturan & Backup</span>
+        </a>
+      </nav>
+
+      <div class="user-profile-widget">
+        <div class="avatar"><i class="fa-solid fa-user-shield"></i></div>
+        <div class="user-info">
+          <span class="user-name">Owner SakaPay</span>
+          <span class="user-role">Super Admin (Offline)</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Top Bar dengan Tombol Hamburger -->
+      <header class="top-bar glass-card">
+        <button id="hamburger-btn" class="hamburger-btn" onclick="toggleSidebar()">
+          <i class="fa-solid fa-bars"></i>
+        </button>
+        <span class="top-bar-title">SakaPay Business Center</span>
+      </header>
+
+      <div id="content-area" class="content-body" style="padding-top: 10px;">
+        
+        <!-- PAGE: OVERVIEW -->
+        <section id="page-overview" class="page-view">
+          <div class="metrics-grid">
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Total Saldo & Kas</span>
+                <i class="fa-solid fa-building-columns icon-teal"></i>
+              </div>
+              <h3 class="metric-value" id="val-total-modal">Rp 0</h3>
+              <span class="metric-sub text-muted">Akumulasi Seluruh Rekening</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Omzet Hari Ini</span>
+                <i class="fa-solid fa-chart-simple icon-blue"></i>
+              </div>
+              <h3 class="metric-value" id="val-omzet-today">Rp 0</h3>
+              <span class="metric-sub text-positive">Realtime Lokal</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Profit Hari Ini</span>
+                <i class="fa-solid fa-sack-dollar icon-green"></i>
+              </div>
+              <h3 class="metric-value" id="val-profit-today">Rp 0</h3>
+              <span class="metric-sub text-muted">Bersih Admin Fee</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Total Transaksi</span>
+                <i class="fa-solid fa-receipt icon-orange"></i>
+              </div>
+              <h3 class="metric-value" id="val-total-tx">0</h3>
+              <span class="metric-sub text-muted">Transaksi Tercatat</span>
+            </div>
+            <!-- Tambahkan di bawah metric-card profit hari ini -->
+<div class="metric-card glass-card">
+  <div class="metric-header">
+    <span>Omzet Bulan Ini</span>
+    <i class="fa-solid fa-chart-line icon-blue"></i>
+  </div>
+  <h3 class="metric-value" id="val-omzet-month">Rp 0</h3>
+  <span class="metric-sub text-positive">Akumulasi Bulan Berjalan</span>
+</div>
+
+<div class="metric-card glass-card">
+  <div class="metric-header">
+    <span>Profit Bulan Ini</span>
+    <i class="fa-solid fa-wallet icon-green"></i>
+  </div>
+  <h3 class="metric-value" id="val-profit-month">Rp 0</h3>
+  <span class="metric-sub text-positive">Bersih Bulan Berjalan</span>
+</div>
+          </div>
+
+           
+
+          
+          <!-- Dashboard Grid: Diturunkan ke bawah secara vertikal -->
+          <div class="dashboard-grid">
+            <div class="glass-card chart-container">
+              <div class="card-title">
+                <h4><i class="fa-solid fa-chart-area"></i> Grafik Omzet Mingguan</h4>
+              </div>
+              <div class="canvas-wrapper">
+                <canvas id="revenueChart"></canvas>
+              </div>
+            </div>
+
+            <div class="glass-card recent-tx-container">
+              <div class="card-title flex-between">
+                <h4><i class="fa-solid fa-clock-rotate-left"></i> Transaksi Terakhir</h4>
+              </div>
+              <div class="tx-list" id="recent-tx-list">
+                <p class="empty-state">Belum ada transaksi.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE: INPUT TRANSAKSI (TARIK SETOR) -->
+        <section id="page-tariksetor" class="page-view active">
+          <div class="card-title" style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-building-columns" style="font-size: 20px; color: var(--primary-color);"></i>
+            <h4 style="font-size: 18px;">Input Transaksi Tarik / Setor</h4>
+          </div>
+
+          <div class="glass-card" style="padding: 24px;">
+            <form id="tarik-setor-form" style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-calendar"></i> Tanggal Transaksi</label>
+                <input type="datetime-local" id="ts-date" class="glass-input" required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-layer-group"></i> Aplikasi / Sumber Dana</label>
+                <select id="ts-account" class="glass-input" required>
+                  <option value="" disabled selected>-- Pilih Aplikasi --</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-list-check"></i> Layanan</label>
+                <select id="ts-service" class="glass-input" required>
+                  <option value="Setor Tunai">Setor Tunai</option>
+                  <option value="Tarik Tunai">Tarik Tunai</option>
+                  <option value="Transfer Bank Lain">Transfer Bank Lain</option>
+                  <option value="Transfer Sesama">Transfer Sesama</option>
+                  <option value="Setor Pinjaman">Setor Pinjaman</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-money-bill-wave"></i> Harga Modal (Rp)</label>
+                <input type="number" id="ts-admin-bank" class="glass-input" value="0" placeholder="Masukkan modal..." required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-tags"></i> Harga Jual (Rp)</label>
+                <input type="number" id="ts-admin-agen" class="glass-input" placeholder="Masukkan harga jual..." required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-wallet"></i> Pelanggan Bayar Pakai</label>
+                <select id="ts-pay-method" class="glass-input">
+                  <option value="Uang Cash">Via UANG CASH</option>
+                  <option value="Transfer / Saldo">Via Transfer / Saldo</option>
+                  <option value="Hutang">Hutang (Belum Bayar)</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-user"></i> Nama Pelanggan (Wajib jika Hutang)</label>
+                <input type="text" id="ts-customer" class="glass-input" placeholder="Nama peminjam / penghutang...">
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-note-sticky"></i> Keterangan (Opsional)</label>
+                <input type="text" id="ts-notes" class="glass-input" placeholder="Tambahkan catatan jika perlu...">
+              </div>
+
+              <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px; margin-top: 8px;">
+                <i class="fa-solid fa-circle-check"></i> Simpan Transaksi
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <!-- PAGE: PPOB & PULSA -->
+        <section id="page-ppob" class="page-view">
+          <div class="card-title" style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
+            <i class="fa-solid fa-wallet" style="font-size: 20px; color: var(--primary-color);"></i>
+            <h4 style="font-size: 18px;">Input Transaksi PPOB / Pulsa</h4>
+          </div>
+
+          <div class="glass-card" style="padding: 24px;">
+            <form id="ppob-form" style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-layer-group"></i> Pilih Aplikasi / Sumber Saldo</label>
+                <select id="ppob-account" class="glass-input" required>
+                  <option value="" disabled selected>-- Pilih Aplikasi --</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-list-check"></i> Produk / Layanan PPOB</label>
+                <select id="ppob-service" class="glass-input" required>
+                  <option value="Pulsa Reguler">Pulsa Reguler</option>
+                  <option value="Paket Data / Internet">Paket Data / Internet</option>
+                  <option value="Token Listrik PLN">Token Listrik PLN</option>
+                  <option value="Voucher Game">Voucher Game</option>
+                  <option value="Bayar Tagihan BPJS/PDAM">Bayar Tagihan BPJS/PDAM</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-mobile-screen"></i> Nomor Tujuan / ID Pelanggan</label>
+                <input type="text" id="ppob-target" class="glass-input" placeholder="No HP / No Meter / ID Pelanggan" required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-money-bill-wave"></i> Harga Modal (Rp)</label>
+                <input type="number" id="ppob-modal" class="glass-input" placeholder="Modal dari server..." required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-tags"></i> Harga Jual (Rp)</label>
+                <input type="number" id="ppob-jual" class="glass-input" placeholder="Harga ke pelanggan..." required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-wallet"></i> Pelanggan Bayar Pakai</label>
+                <select id="ppob-pay-method" class="glass-input">
+                  <option value="Uang Cash">Via UANG CASH</option>
+                  <option value="Transfer / Saldo">Via Transfer / Saldo</option>
+                  <option value="Hutang">Hutang (Belum Bayar)</option>
+                </select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-user"></i> Nama Pelanggan (Wajib jika Hutang)</label>
+                <input type="text" id="ppob-customer" class="glass-input" placeholder="Nama peminjam / penghutang...">
+              </div>
+
+              <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px; margin-top: 8px;">
+                <i class="fa-solid fa-circle-check"></i> Simpan Transaksi PPOB
+              </button>
+            </form>
+          </div>
+        </section>
+
+        <!-- PAGE: KASIR VOUCHER & MASTER STOK -->
+        <section id="page-voucher" class="page-view">
+          <div class="card-title flex-between" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-ticket"></i> Kasir & Stok Voucher Fisik</h4>
+            <button class="btn-primary" id="btn-add-voucher-modal" style="font-size: 12px; padding: 6px 12px;">
+              <i class="fa-solid fa-plus"></i> Tambah Master Voucher
+            </button>
+          </div>
+
+          <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
+            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-cart-shopping"></i> Form Penjualan Voucher</h5>
+            <form id="sell-voucher-form" style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Pilih Voucher</label>
+                <select id="vouch-select-item" class="glass-input" required></select>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Pilih Aplikasi Inject Saldo</label>
+                <select id="vouch-select-account" class="glass-input" required></select>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>Jumlah Beli (Pcs)</label>
+                  <input type="number" id="vouch-qty" class="glass-input" value="1" min="1" required>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label>Metode Pembayaran</label>
+                  <select id="vouch-pay-method" class="glass-input">
+                    <option value="Uang Cash">Via UANG CASH</option>
+                    <option value="Transfer / Saldo">Via Transfer</option>
+                    <option value="Hutang">Hutang (Belum Bayar)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Nama Pelanggan (Wajib jika Hutang)</label>
+                <input type="text" id="vouch-customer-name" class="glass-input" placeholder="Nama pembeli...">
+              </div>
+
+              <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px; margin-top: 4px;">
+                <i class="fa-solid fa-cart-plus"></i> Proses Penjualan Voucher
+              </button>
+            </form>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-boxes-stacked"></i> Master Stok Voucher Aktif</h5>
+            <div class="tx-list" id="voucher-master-list">
+              <p class="empty-state">Belum ada stok voucher.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE: CATATAN HUTANG -->
+        <section id="page-debts" class="page-view">
+          <div class="card-title" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-book-bookmark"></i> Daftar Catatan Hutang Pelanggan</h4>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div class="tx-list" id="debt-list">
+              <p class="empty-state">Belum ada catatan hutang.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE: TRANSACTIONS (RIWAYAT) -->
+        <section id="page-transactions" class="page-view">
+          <div class="card-title flex-between" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-receipt"></i> Riwayat Transaksi</h4>
+            <button class="btn-primary" id="btn-tx-page-new" style="font-size: 12px; padding: 6px 12px;" onclick="switchPage('tariksetor')">
+              <i class="fa-solid fa-plus"></i> Transaksi Baru
+            </button>
+          </div>
+
+          <div class="glass-card" style="padding: 16px; margin-bottom: 16px;">
+            <div style="display: flex; gap: 10px;">
+              <input type="text" id="search-tx-input" class="glass-input" placeholder="Cari layanan / keterangan..." style="flex: 1;">
+            </div>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div class="card-title">
+              <h4>Daftar Transaksi Tercatat</h4>
+            </div>
+            <div class="tx-list" id="full-tx-list">
+              <p class="empty-state">Belum ada transaksi tercatat.</p>
+            </div>
+          </div>
+          <!-- Tambahkan di dalam section #page-transactions -->
+<div class="glass-card" style="padding: 20px; margin-bottom: 16px;">
+  <div class="card-title" style="margin-bottom: 12px;">
+    <h4><i class="fa-solid fa-file-excel"></i> Export Riwayat Transaksi (Excel)</h4>
+  </div>
+  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+    <button class="btn-primary" id="btn-export-daily" style="background: #107c41; flex: 1; justify-content: center;">
+      <i class="fa-solid fa-download"></i> Export Harian (.xlsx)
+    </button>
+    <button class="btn-primary" id="btn-export-monthly" style="background: #107c41; flex: 1; justify-content: center;">
+      <i class="fa-solid fa-download"></i> Export Bulanan (.xlsx)
+    </button>
+  </div>
+</div>
+
+        </section>
+
+        <!-- PAGE: BALANCES -->
+        <section id="page-balances" class="page-view">
+          <div class="card-title flex-between" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-vault"></i> Daftar Akun & Saldo</h4>
+            <button class="btn-primary" id="btn-add-account" style="font-size: 12px; padding: 6px 12px;">
+              <i class="fa-solid fa-plus"></i> Tambah Akun
+            </button>
+          </div>
+
+          <div class="metrics-grid" id="accounts-grid" style="margin-bottom: 24px;"></div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div class="card-title">
+              <h4><i class="fa-solid fa-sliders"></i> Penyesuaian Saldo Manual (Adjustment)</h4>
+            </div>
+            <form id="adjust-balance-form" style="display: flex; flex-direction: column; gap: 12px; margin-top: 12px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Pilih Akun / Rekening</label>
+                <select id="adj-account-id" class="glass-input" required></select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Saldo Baru (Rp)</label>
+                <input type="number" id="adj-new-balance" class="glass-input" placeholder="Contoh: 2000000" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Alasan / Keterangan Penyesuaian</label>
+                <input type="text" id="adj-notes" class="glass-input" placeholder="Contoh: Koreksi fisik uang kas" required>
+              </div>
+              <button type="submit" class="btn-primary" style="margin-top: 4px;">Simpan Perubahan Saldo</button>
+            </form>
+          </div>
+        </section>
+
+        <!-- PAGE: FINANCE -->
+        <section id="page-finance" class="page-view">
+          <div class="card-title flex-between" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-coins"></i> Catatan Keuangan & Operasional</h4>
+            <button class="btn-primary" id="btn-add-expense" style="font-size: 12px; padding: 6px 12px;">
+              <i class="fa-solid fa-plus"></i> Catat Pengeluaran
+            </button>
+          </div>
+
+          <div class="metrics-grid" style="margin-bottom: 24px;">
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Total Pengeluaran Operasional</span>
+                <i class="fa-solid fa-file-invoice-dollar icon-orange"></i>
+              </div>
+               <h3 class="metric-value" id="val-total-operational">Rp 0</h3>
+              <span class="metric-sub text-muted">Biaya Toko / Admin</span>
+            </div>
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Total Pengambilan Pribadi</span>
+                <i class="fa-solid fa-hand-holding-dollar icon-blue"></i>
+              </div>
+              <h3 class="metric-value" id="val-total-prive">Rp 0</h3>
+              <span class="metric-sub text-muted">Prive Pemilik</span>
+            </div>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div class="card-title">
+              <h4><i class="fa-solid fa-list"></i> Riwayat Pengeluaran & Keuangan</h4>
+            </div>
+            <div class="tx-list" id="expense-list" style="margin-top: 12px;">
+              <p class="empty-state">Belum ada catatan pengeluaran.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE: CUSTOMERS -->
+        <section id="page-customers" class="page-view">
+          <div class="card-title flex-between" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-users"></i> Database Pelanggan Setia</h4>
+            <button class="btn-primary" id="btn-add-customer" style="font-size: 12px; padding: 6px 12px;">
+              <i class="fa-solid fa-plus"></i> Tambah Pelanggan
+            </button>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div class="tx-list" id="customer-list">
+              <p class="empty-state">Belum ada data pelanggan.</p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+
+    <!-- Bottom Navigation (Menu Utama di Bawah) -->
+    <nav class="bottom-nav glass-card">
+      <a href="#overview" class="bottom-nav-item" data-page="overview">
+        <i class="fa-solid fa-chart-pie"></i>
+        <span>Dashboard</span>
+      </a>
+      <a href="#tariksetor" class="bottom-nav-item active" data-page="tariksetor">
+        <i class="fa-solid fa-building-columns"></i>
+        <span>Tarik Setor</span>
+      </a>
+      <a href="#ppob" class="bottom-nav-item" data-page="ppob">
+        <i class="fa-solid fa-wallet"></i>
+        <span>PPOB</span>
+      </a>
+      <a href="#voucher" class="bottom-nav-item" data-page="voucher">
+        <i class="fa-solid fa-ticket"></i>
+        <span>Voucher</span>
+      </a>
+      <a href="#transactions" class="bottom-nav-item" data-page="transactions">
+        <i class="fa-solid fa-receipt"></i>
+        <span>Riwayat</span>
+      </a>
+    </nav>
+
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
