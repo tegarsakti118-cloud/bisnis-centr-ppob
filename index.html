@@ -9,6 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -73,7 +74,7 @@
       <div id="content-area" class="content-body" style="padding-top: 10px;">
         
         <!-- PAGE: OVERVIEW -->
-        <section id="page-overview" class="page-view">
+        <section id="page-overview" class="page-view active">
           <div class="metrics-grid">
             <div class="metric-card glass-card">
               <div class="metric-header">
@@ -110,30 +111,27 @@
               <h3 class="metric-value" id="val-total-tx">0</h3>
               <span class="metric-sub text-muted">Transaksi Tercatat</span>
             </div>
-            <!-- Tambahkan di bawah metric-card profit hari ini -->
-<div class="metric-card glass-card">
-  <div class="metric-header">
-    <span>Omzet Bulan Ini</span>
-    <i class="fa-solid fa-chart-line icon-blue"></i>
-  </div>
-  <h3 class="metric-value" id="val-omzet-month">Rp 0</h3>
-  <span class="metric-sub text-positive">Akumulasi Bulan Berjalan</span>
-</div>
 
-<div class="metric-card glass-card">
-  <div class="metric-header">
-    <span>Profit Bulan Ini</span>
-    <i class="fa-solid fa-wallet icon-green"></i>
-  </div>
-  <h3 class="metric-value" id="val-profit-month">Rp 0</h3>
-  <span class="metric-sub text-positive">Bersih Bulan Berjalan</span>
-</div>
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Omzet Bulan Ini</span>
+                <i class="fa-solid fa-chart-line icon-blue"></i>
+              </div>
+              <h3 class="metric-value" id="val-omzet-month">Rp 0</h3>
+              <span class="metric-sub text-positive">Akumulasi Bulan Berjalan</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Profit Bulan Ini</span>
+                <i class="fa-solid fa-wallet icon-green"></i>
+              </div>
+              <h3 class="metric-value" id="val-profit-month">Rp 0</h3>
+              <span class="metric-sub text-positive">Bersih Bulan Berjalan</span>
+            </div>
           </div>
 
-           
-
-          
-          <!-- Dashboard Grid: Diturunkan ke bawah secara vertikal -->
+          <!-- Dashboard Grid -->
           <div class="dashboard-grid">
             <div class="glass-card chart-container">
               <div class="card-title">
@@ -156,7 +154,7 @@
         </section>
 
         <!-- PAGE: INPUT TRANSAKSI (TARIK SETOR) -->
-        <section id="page-tariksetor" class="page-view active">
+        <section id="page-tariksetor" class="page-view">
           <div class="card-title" style="margin-bottom: 16px; display: flex; align-items: center; gap: 10px;">
             <i class="fa-solid fa-building-columns" style="font-size: 20px; color: var(--primary-color);"></i>
             <h4 style="font-size: 18px;">Input Transaksi Tarik / Setor</h4>
@@ -183,26 +181,26 @@
                   <option value="Tarik Tunai">Tarik Tunai</option>
                   <option value="Transfer Bank Lain">Transfer Bank Lain</option>
                   <option value="Transfer Sesama">Transfer Sesama</option>
-                  <option value="Setor Pinjaman">Setor Pinjaman</option>
+                  <option value="Topup Gopay">Topup Gopay</option>
+                  <option value="Topup Ovo">Topup Ovo</option>
+                  <option value="Topup Shopeepay">Topup Shopeepay</option>
                 </select>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-money-bill-wave"></i> Harga Modal (Rp)</label>
-                <input type="number" id="ts-admin-bank" class="glass-input" value="0" placeholder="Masukkan modal..." required>
+                <input type="text" inputmode="numeric" id="ts-admin-bank" class="glass-input" placeholder="Masukkan modal..." required>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-tags"></i> Harga Jual (Rp)</label>
-                <input type="number" id="ts-admin-agen" class="glass-input" placeholder="Masukkan harga jual..." required>
+                <input type="text" inputmode="numeric" id="ts-admin-agen" class="glass-input" placeholder="Masukkan harga jual..." required>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-wallet"></i> Pelanggan Bayar Pakai</label>
-                <select id="ts-pay-method" class="glass-input">
-                  <option value="Uang Cash">Via UANG CASH</option>
-                  <option value="Transfer / Saldo">Via Transfer / Saldo</option>
-                  <option value="Hutang">Hutang (Belum Bayar)</option>
+                <select id="ts-pay-method" class="glass-input" required>
+                  <option value="">-- Pilih Rekening Penerima --</option>
                 </select>
               </div>
 
@@ -257,20 +255,18 @@
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-money-bill-wave"></i> Harga Modal (Rp)</label>
-                <input type="number" id="ppob-modal" class="glass-input" placeholder="Modal dari server..." required>
+                <input type="text" inputmode="numeric" id="ppob-modal" class="glass-input" placeholder="Modal dari server..." required>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-tags"></i> Harga Jual (Rp)</label>
-                <input type="number" id="ppob-jual" class="glass-input" placeholder="Harga ke pelanggan..." required>
+                <input type="text" inputmode="numeric" id="ppob-jual" class="glass-input" placeholder="Harga ke pelanggan..." required>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-wallet"></i> Pelanggan Bayar Pakai</label>
-                <select id="ppob-pay-method" class="glass-input">
-                  <option value="Uang Cash">Via UANG CASH</option>
-                  <option value="Transfer / Saldo">Via Transfer / Saldo</option>
-                  <option value="Hutang">Hutang (Belum Bayar)</option>
+                <select id="ppob-pay-method" class="glass-input" required>
+                  <option value="">-- Pilih Rekening Penerima --</option>
                 </select>
               </div>
 
@@ -286,39 +282,37 @@
           </div>
         </section>
 
-        <!-- PAGE: KASIR VOUCHER & MASTER STOK -->
+                <!-- PAGE: KASIR & STOK BARANG -->
         <section id="page-voucher" class="page-view">
           <div class="card-title flex-between" style="margin-bottom: 16px;">
-            <h4><i class="fa-solid fa-ticket"></i> Kasir & Stok Voucher Fisik</h4>
+            <h4><i class="fa-solid fa-cash-register"></i> Kasir & Stok Barang</h4>
             <button class="btn-primary" id="btn-add-voucher-modal" style="font-size: 12px; padding: 6px 12px;">
-              <i class="fa-solid fa-plus"></i> Tambah Master Voucher
+              <i class="fa-solid fa-plus"></i> Tambah Produk
             </button>
           </div>
 
           <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
-            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-cart-shopping"></i> Form Penjualan Voucher</h5>
+            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-cart-shopping"></i> Form Transaksi Kasir</h5>
             <form id="sell-voucher-form" style="display: flex; flex-direction: column; gap: 14px;">
               <div class="form-group" style="margin-bottom: 0;">
-                <label>Pilih Voucher</label>
+                <label>Pilih Produk / Barang</label>
                 <select id="vouch-select-item" class="glass-input" required></select>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
-                <label>Pilih Aplikasi Inject Saldo</label>
+                <label>Akun / Sumber Modal Barang</label>
                 <select id="vouch-select-account" class="glass-input" required></select>
               </div>
 
               <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
                 <div class="form-group" style="margin-bottom: 0;">
-                  <label>Jumlah Beli (Pcs)</label>
+                  <label>Jumlah (Pcs)</label>
                   <input type="number" id="vouch-qty" class="glass-input" value="1" min="1" required>
                 </div>
                 <div class="form-group" style="margin-bottom: 0;">
                   <label>Metode Pembayaran</label>
-                  <select id="vouch-pay-method" class="glass-input">
-                    <option value="Uang Cash">Via UANG CASH</option>
-                    <option value="Transfer / Saldo">Via Transfer</option>
-                    <option value="Hutang">Hutang (Belum Bayar)</option>
+                  <select id="vouch-pay-method" class="glass-input" required>
+                    <option value="">-- Pilih Pembayaran --</option>
                   </select>
                 </div>
               </div>
@@ -329,15 +323,15 @@
               </div>
 
               <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px; margin-top: 4px;">
-                <i class="fa-solid fa-cart-plus"></i> Proses Penjualan Voucher
+                <i class="fa-solid fa-cart-plus"></i> Proses Penjualan Kasir
               </button>
             </form>
           </div>
 
           <div class="glass-card" style="padding: 20px;">
-            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-boxes-stacked"></i> Master Stok Voucher Aktif</h5>
+            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-boxes-stacked"></i> Daftar Stok Produk Aktif</h5>
             <div class="tx-list" id="voucher-master-list">
-              <p class="empty-state">Belum ada stok voucher.</p>
+              <p class="empty-state">Belum ada stok produk.</p>
             </div>
           </div>
         </section>
@@ -364,35 +358,60 @@
             </button>
           </div>
 
+          <!-- Tombol Cetak Struk Gabungan & Info Total Data -->
+          <div class="glass-card" style="padding: 12px 16px; margin-bottom: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+            <button class="btn-primary" id="btn-print-batch" style="background: var(--glass-bg); border: 1px solid var(--glass-border); color: #fff; font-size: 12px; padding: 8px 14px;">
+              <i class="fa-solid fa-print"></i> Cetak Struk Gabungan
+            </button>
+            <span style="font-size: 12px; color: var(--text-muted);" id="tx-count-label">Menampilkan total 0 data</span>
+          </div>
+
+          <!-- Input Pencarian -->
+          <div class="glass-card" style="padding: 12px; margin-bottom: 14px;">
+            <input type="text" id="search-tx-input" class="glass-input" placeholder="Cari ID, layanan, atau keterangan...">
+          </div>
+
+          <!-- Tombol Export Excel -->
           <div class="glass-card" style="padding: 16px; margin-bottom: 16px;">
-            <div style="display: flex; gap: 10px;">
-              <input type="text" id="search-tx-input" class="glass-input" placeholder="Cari layanan / keterangan..." style="flex: 1;">
+            <div class="card-title" style="margin-bottom: 10px;">
+              <h4 style="font-size: 13px;"><i class="fa-solid fa-file-excel"></i> Export Excel (.xlsx)</h4>
+            </div>
+            <div class="export-btn-container">
+              <button class="btn-primary" id="btn-export-daily" style="background: #107c41;">
+                <i class="fa-solid fa-download"></i> Export Harian
+              </button>
+              <button class="btn-primary" id="btn-export-monthly" style="background: #107c41;">
+                <i class="fa-solid fa-download"></i> Export Bulanan
+              </button>
             </div>
           </div>
 
-          <div class="glass-card" style="padding: 20px;">
-            <div class="card-title">
-              <h4>Daftar Transaksi Tercatat</h4>
-            </div>
-            <div class="tx-list" id="full-tx-list">
-              <p class="empty-state">Belum ada transaksi tercatat.</p>
+          <!-- TABEL RIWAYAT TRANSAKSI DENGAN FITUR GESER (SCROLL HORIZONTAL) -->
+          <div class="glass-card" style="padding: 0; overflow: hidden;">
+            <div class="table-responsive">
+              <table class="tx-table">
+                <thead>
+                  <tr>
+                    <th style="width: 40px; text-align: center;">PILIH</th>
+                    <th>INFO TRANSAKSI</th>
+                    <th>KARYAWAN</th>
+                    <th>APLIKASI</th>
+                    <th>LAYANAN</th>
+                    <th>KETERANGAN</th>
+                    <th style="text-align: right;">PENJUALAN</th>
+                    <th style="text-align: right;">MODAL</th>
+                    <th style="text-align: right;">KEUNTUNGAN</th>
+                    <th style="text-align: center;">AKSI</th>
+                  </tr>
+                </thead>
+                <tbody id="full-tx-table-body">
+                  <tr>
+                    <td colspan="10" class="empty-state">Belum ada transaksi tercatat.</td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
-          <!-- Tambahkan di dalam section #page-transactions -->
-<div class="glass-card" style="padding: 20px; margin-bottom: 16px;">
-  <div class="card-title" style="margin-bottom: 12px;">
-    <h4><i class="fa-solid fa-file-excel"></i> Export Riwayat Transaksi (Excel)</h4>
-  </div>
-  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-    <button class="btn-primary" id="btn-export-daily" style="background: #107c41; flex: 1; justify-content: center;">
-      <i class="fa-solid fa-download"></i> Export Harian (.xlsx)
-    </button>
-    <button class="btn-primary" id="btn-export-monthly" style="background: #107c41; flex: 1; justify-content: center;">
-      <i class="fa-solid fa-download"></i> Export Bulanan (.xlsx)
-    </button>
-  </div>
-</div>
-
         </section>
 
         <!-- PAGE: BALANCES -->
@@ -417,7 +436,7 @@
               </div>
               <div class="form-group" style="margin-bottom: 0;">
                 <label>Saldo Baru (Rp)</label>
-                <input type="number" id="adj-new-balance" class="glass-input" placeholder="Contoh: 2000000" required>
+                <input type="text" inputmode="numeric" id="adj-new-balance" class="glass-input" placeholder="Contoh: 2.000.000" required>
               </div>
               <div class="form-group" style="margin-bottom: 0;">
                 <label>Alasan / Keterangan Penyesuaian</label>
@@ -443,7 +462,7 @@
                 <span>Total Pengeluaran Operasional</span>
                 <i class="fa-solid fa-file-invoice-dollar icon-orange"></i>
               </div>
-               <h3 class="metric-value" id="val-total-operational">Rp 0</h3>
+              <h3 class="metric-value" id="val-total-operational">Rp 0</h3>
               <span class="metric-sub text-muted">Biaya Toko / Admin</span>
             </div>
             <div class="metric-card glass-card">
@@ -487,11 +506,11 @@
 
     <!-- Bottom Navigation (Menu Utama di Bawah) -->
     <nav class="bottom-nav glass-card">
-      <a href="#overview" class="bottom-nav-item" data-page="overview">
+      <a href="#overview" class="bottom-nav-item active" data-page="overview">
         <i class="fa-solid fa-chart-pie"></i>
         <span>Dashboard</span>
       </a>
-      <a href="#tariksetor" class="bottom-nav-item active" data-page="tariksetor">
+      <a href="#tariksetor" class="bottom-nav-item " data-page="tariksetor">
         <i class="fa-solid fa-building-columns"></i>
         <span>Tarik Setor</span>
       </a>

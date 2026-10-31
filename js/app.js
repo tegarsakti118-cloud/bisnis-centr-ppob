@@ -8,31 +8,158 @@ document.addEventListener('DOMContentLoaded', () => {
   initTarikSetorPage();
   initPpobPage();
   initVoucherPage();
+  switchPage('overview');
 });
+
+// Helper: Notifikasi Cantik (Toast)
+function showNotification(message, type = 'success') {
+  let toast = document.getElementById('custom-toast-container');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'custom-toast-container';
+    document.body.appendChild(toast);
+  }
+  const icon = type === 'success' ? 'fa-solid fa-circle-check' : 'fa-solid fa-triangle-exclamation';
+  const color = type === 'success' ? '#34d399' : '#f87171';
+  toast.style.borderColor = color;
+  toast.innerHTML = `<i class="${icon}" style="color: ${color}; font-size: 20px;"></i><div style="font-size: 13px; font-weight: 500; color: #f8fafc;">${message}</div>`;
+  setTimeout(() => toast.classList.add('show'), 10);
+  clearTimeout(window.toastTimer);
+  window.toastTimer = setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+// Helper: Universal Modal Konfirmasi (Pengganti confirm())
+function showConfirm(title, message, onConfirm, isDanger = false) {
+    const oldModal = document.getElementById('custom-confirm-modal');
+    if (oldModal) oldModal.remove();
+
+    const borderColor = isDanger ? 'rgba(248,113,113,0.3)' : 'rgba(52,211,153,0.3)';
+    const iconColor = isDanger ? '#f87171' : '#34d399';
+    const iconClass = isDanger ? 'fa-solid fa-triangle-exclamation' : 'fa-solid fa-circle-question';
+    const btnBg = isDanger ? '#f87171' : '#17A897';
+
+    const modal = document.createElement('div');
+    modal.id = 'custom-confirm-modal';
+    modal.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 99999; padding: 20px; backdrop-filter: blur(4px);
+    `;
+    modal.innerHTML = `
+        <div style="background: #1e293b; border: 1px solid ${borderColor}; padding: 22px; border-radius: 16px; width: 100%; max-width: 340px; color: white; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: ${iconColor};">
+                <i class="${iconClass}" style="font-size: 20px;"></i>
+                <h3 style="font-size: 16px; font-weight: 600; margin: 0;">${title}</h3>
+            </div>
+            <p style="font-size: 13px; color: #94a3b8; margin-bottom: 20px; line-height: 1.4;">
+                ${message}
+            </p>
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-cancel-custom" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;">Batal</button>
+                <button id="btn-confirm-custom" style="flex: 1; padding: 10px; background: ${btnBg}; border: none; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;">Ya, Lanjutkan</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    document.getElementById('btn-cancel-custom').onclick = () => modal.remove();
+    document.getElementById('btn-confirm-custom').onclick = () => {
+        modal.remove();
+        if (typeof onConfirm === 'function') onConfirm();
+    };
+}
+
+// Helper: Universal Modal Input (Pengganti prompt())
+function showPrompt(title, label, defaultValue = '', callback, isNumber = false) {
+    const oldModal = document.getElementById('custom-prompt-modal');
+    if (oldModal) oldModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'custom-prompt-modal';
+    modal.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 99999; padding: 20px; backdrop-filter: blur(4px);
+    `;
+    modal.innerHTML = `
+        <div style="background: #1e293b; border: 1px solid rgba(52,211,153,0.3); padding: 22px; border-radius: 16px; width: 100%; max-width: 360px; color: white; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px; color: #34d399;">
+                <i class="fa-solid fa-pen-to-square" style="font-size: 20px;"></i>
+                <h3 style="font-size: 16px; font-weight: 600; margin: 0;">${title}</h3>
+            </div>
+            <p style="font-size: 13px; color: #94a3b8; margin-bottom: 12px; line-height: 1.4;">
+                ${label}
+            </p>
+            <input type="text" ${isNumber ? 'inputmode="numeric"' : ''} id="custom-prompt-input" value="${defaultValue}" class="glass-input" style="width: 100%; padding: 10px 12px; margin-bottom: 20px; background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; color: #fff; font-size: 14px;">
+            <div style="display: flex; gap: 10px;">
+                <button id="btn-cancel-prompt" style="flex: 1; padding: 10px; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #fff; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;">Batal</button>
+                <button id="btn-submit-prompt" style="flex: 1; padding: 10px; background: #17A897; border: none; color: #fff; border-radius: 8px; cursor: pointer; font-weight: 600; font-size: 13px;">Simpan</button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const inputEl = document.getElementById('custom-prompt-input');
+    inputEl.focus();
+    inputEl.select();
+
+    if (isNumber) {
+        formatNumberInput(inputEl);
+    }
+
+    document.getElementById('btn-cancel-prompt').onclick = () => modal.remove();
+    document.getElementById('btn-submit-prompt').onclick = () => {
+        const val = isNumber ? inputEl.value.replace(/\./g, '') : inputEl.value.trim();
+        modal.remove();
+        if (typeof callback === 'function') callback(val);
+    };
+
+    inputEl.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+            document.getElementById('btn-submit-prompt').click();
+        }
+    };
+}
+
+// Helper: Format input menjadi titik ribuan otomatis
+function formatNumberInput(inputElement) {
+  if (!inputElement) return;
+
+  inputElement.addEventListener('input', (e) => {
+    let value = e.target.value.replace(/\D/g, '');
+    if (value) {
+      e.target.value = parseInt(value, 10).toLocaleString('id-ID');
+    } else {
+      e.target.value = '';
+    }
+  });
+}
+
+// Helper: Ambil angka murni dari string ber-titik
+function getCleanNumber(inputElement) {
+  if (!inputElement || !inputElement.value) return 0;
+  return parseFloat(inputElement.value.replace(/\./g, '')) || 0;
+}
 
 // Fungsi Buka / Tutup Sidebar (Hamburger)
 function toggleSidebar() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
 
-  sidebar.classList.toggle('open');
+  if (sidebar) sidebar.classList.toggle('open');
   if (overlay) overlay.classList.toggle('active');
 }
 
 function switchPage(pageTarget) {
-  // Hapus kelas active dari semua menu (sidebar & bottom nav)
   const allNavs = document.querySelectorAll('.nav-link, .bottom-nav-item');
   allNavs.forEach(n => n.classList.remove('active'));
 
-  // Tambahkan active ke menu yang dipilih
   document.querySelectorAll(`[data-page="${pageTarget}"]`).forEach(el => el.classList.add('active'));
 
-  // Tampilkan halaman yang sesuai
   document.querySelectorAll('.page-view').forEach(p => p.classList.remove('active'));
   const targetSection = document.getElementById(`page-${pageTarget}`);
   if (targetSection) targetSection.classList.add('active');
 
-  // Load data spesifik sesuai halaman
   if (pageTarget === 'transactions') loadTransactionsPage();
   if (pageTarget === 'balances') loadBalancePage();
   if (pageTarget === 'finance') loadFinancePage();
@@ -42,7 +169,6 @@ function switchPage(pageTarget) {
   if (pageTarget === 'ppob') initPpobPage();
   if (pageTarget === 'voucher') initVoucherPage();
 
-  // Tutup sidebar otomatis jika terbuka
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('sidebar-overlay');
   if (sidebar) sidebar.classList.remove('open');
@@ -62,49 +188,100 @@ function initNavigation() {
 }
 
 function initTarikSetorPage() {
-  const db = getAppData();
-  const selectAcc = document.getElementById('ts-account');
-  if (selectAcc) {
-    selectAcc.innerHTML = `<option value="" disabled selected>-- Pilih Aplikasi --</option>` +
-      db.accounts.map(acc => `<option value="${acc.id}">${acc.name} (${formatRupiah(acc.balance)})</option>`).join('');
-  }
+    const db = getAppData();
+    const selectAcc = document.getElementById('ts-account');
 
-  const tzDate = document.getElementById('ts-date');
-  if (tzDate && !tzDate.value) {
-    const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    tzDate.value = now.toISOString().slice(0, 16);
-  }
+    if (selectAcc) {
+        selectAcc.innerHTML =
+            '<option value="">-- Pilih Aplikasi --</option>' +
+            db.accounts.map(acc => `
+                <option value="${acc.id}">
+                    ${acc.name} - Saldo: ${formatRupiah(acc.balance)}
+                </option>
+            `).join('');
+    }
+
+    const paySelect = document.getElementById('ts-pay-method');
+    if (paySelect) {
+        paySelect.innerHTML =
+            '<option value="">-- Pilih Rekening Penerima --</option>' +
+            db.accounts.map(acc => `
+                <option value="${acc.id}">
+                    ${acc.name} - Saldo: ${formatRupiah(acc.balance)}
+                </option>
+            `).join('') +
+            '<option value="Hutang">Hutang (Belum Dibayar)</option>';
+    }
+
+    const tzDate = document.getElementById('ts-date');
+    if (tzDate && !tzDate.value) {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        tzDate.value = now.toISOString().slice(0, 16);
+    }
+
+    formatNumberInput(document.getElementById('ts-admin-bank'));
+    formatNumberInput(document.getElementById('ts-admin-agen'));
 }
 
 function initPpobPage() {
-  const db = getAppData();
-  const selectAcc = document.getElementById('ppob-account');
-  if (selectAcc) {
-    selectAcc.innerHTML = `<option value="" disabled selected>-- Pilih Aplikasi --</option>` +
-      db.accounts.map(acc => `<option value="${acc.id}">${acc.name} (${formatRupiah(acc.balance)})</option>`).join('');
-  }
+    const db = getAppData();
+    const accountSelect = document.getElementById('ppob-account');
+
+    if (accountSelect) {
+        accountSelect.innerHTML = '<option value="">-- Pilih Aplikasi --</option>';
+        db.accounts.forEach(account => {
+            accountSelect.innerHTML += `
+                <option value="${account.id}">
+                    ${account.name} - Saldo: ${formatRupiah(account.balance)}
+                </option>
+            `;
+        });
+    }
+
+    const paySelect = document.getElementById('ppob-pay-method');
+    if (paySelect) {
+        paySelect.innerHTML = '<option value="">-- Pilih Rekening Penerima --</option>';
+        db.accounts.forEach(account => {
+            paySelect.innerHTML += `
+                <option value="${account.id}">
+                    ${account.name} - Saldo: ${formatRupiah(account.balance)}
+                </option>
+            `;
+        });
+        paySelect.innerHTML += `<option value="Hutang">Hutang (Belum Dibayar)</option>`;
+    }
+
+    formatNumberInput(document.getElementById('ppob-modal'));
+    formatNumberInput(document.getElementById('ppob-jual'));
 }
 
 function initVoucherPage() {
   const db = getAppData();
   const selectVouch = document.getElementById('vouch-select-item');
   const selectAcc = document.getElementById('vouch-select-account');
+  const paySelect = document.getElementById('vouch-pay-method');
   const listEl = document.getElementById('voucher-master-list');
 
   if (selectVouch) {
-    selectVouch.innerHTML = `<option value="" disabled selected>-- Pilih Voucher --</option>` +
+    selectVouch.innerHTML = `<option value="" disabled selected>-- Pilih Produk / Barang --</option>` +
       db.vouchers.map(v => `<option value="${v.id}">${v.name} - Stok: ${v.stock} (${formatRupiah(v.price)})</option>`).join('');
   }
 
   if (selectAcc) {
-    selectAcc.innerHTML = `<option value="" disabled selected>-- Pilih Aplikasi Inject --</option>` +
+    selectAcc.innerHTML = `<option value="" disabled selected>-- Pilih Akun / Sumber Modal (Inject) --</option>` +
       db.accounts.map(acc => `<option value="${acc.id}">${acc.name} (${formatRupiah(acc.balance)})</option>`).join('');
+  }
+
+  if (paySelect) {
+    paySelect.innerHTML = `<option value="" disabled selected>-- Pilih Akun / Rekening Penerima --</option>` +
+      db.accounts.map(acc => `<option value="${acc.id}">${acc.name} (${formatRupiah(acc.balance)})</option>`).join('') +
+      `<option value="Hutang">Hutang (Belum Bayar)</option>`;
   }
 
   if (listEl) {
     if (!db.vouchers || db.vouchers.length === 0) {
-      listEl.innerHTML = `<p class="empty-state">Belum ada stok voucher.</p>`;
+      listEl.innerHTML = `<p class="empty-state">Belum ada stok produk / barang.</p>`;
     } else {
       listEl.innerHTML = db.vouchers.map(v => `
         <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
@@ -112,9 +289,17 @@ function initVoucherPage() {
             <strong style="font-size: 14px; display: block;">${v.name}</strong>
             <span style="font-size: 11px; color: var(--text-muted);">Modal Saldo: ${formatRupiah(v.modal_saldo)} | Modal Fisik: ${formatRupiah(v.modal_fisik)}</span>
           </div>
-          <div style="text-align: right;">
-            <span style="font-size: 14px; font-weight: 700; color: #34d399; display: block;">${formatRupiah(v.price)}</span>
-            <span style="font-size: 11px; color: ${v.stock > 0 ? '#38bdf8' : '#f87171'};">Stok: ${v.stock} pcs</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="text-align: right; margin-right: 4px;">
+              <span style="font-size: 14px; font-weight: 700; color: #34d399; display: block;">${formatRupiah(v.price)}</span>
+              <span style="font-size: 11px; color: ${v.stock > 0 ? '#38bdf8' : '#f87171'};">Stok: ${v.stock} pcs</span>
+            </div>
+            <button onclick="updateStock('${v.id}')" style="background: rgba(56, 189, 248, 0.2); border: 1px solid #38bdf8; color: #38bdf8; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600;" title="Ubah Stok (+ / -)">
+              <i class="fa-solid fa-pen-to-square"></i> Stok
+            </button>
+            <button onclick="deleteProduct('${v.id}')" style="background: rgba(248, 113, 113, 0.2); border: 1px solid #f87171; color: #f87171; padding: 6px 8px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600;" title="Hapus Produk">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
           </div>
         </div>
       `).join('');
@@ -124,225 +309,392 @@ function initVoucherPage() {
   const btnAddModal = document.getElementById('btn-add-voucher-modal');
   if (btnAddModal) {
     btnAddModal.onclick = () => {
-      const name = prompt('Nama Voucher (Contoh: Telkomsel 7GB / 7 Hari):');
-      if (!name) return;
-      const modal_saldo = parseFloat(prompt('Modal Saldo Server / Inject (Rp):', '14987')) || 0;
-      const modal_fisik = parseFloat(prompt('Modal Fisik / Voucher Kosong (Rp):', '300')) || 0;
-      const price = parseFloat(prompt('Harga Jual ke Pelanggan (Rp):', '20000')) || 0;
-      const stock = parseInt(prompt('Jumlah Stok Fisik:', '10')) || 0;
+      showPrompt('Tambah Produk Kasir', 'Nama Produk / Barang (Contoh: Voucher Axis / Charger Vivan):', '', (name) => {
+        if (!name) return;
+        showPrompt('Modal Saldo', 'Modal Saldo / Inject Server (Rp):', '0', (modSaldo) => {
+          const modal_saldo = parseFloat(modSaldo) || 0;
+          showPrompt('Modal Fisik', 'Modal Barang Fisik / Voucher Kosong (Rp):', '0', (modFisik) => {
+            const modal_fisik = parseFloat(modFisik) || 0;
+            showPrompt('Harga Jual', 'Harga Jual ke Pelanggan (Rp):', '0', (prc) => {
+              const price = parseFloat(prc) || 0;
+              showPrompt('Jumlah Stok', 'Jumlah Stok Awal:', '10', (stk) => {
+                const stock = parseInt(stk) || 0;
 
-      db.vouchers.push({
-        id: 'vouch_' + Date.now(),
-        name,
-        modal_saldo,
-        modal_fisik,
-        price,
-        stock
+                db.vouchers.push({
+                  id: 'vouch_' + Date.now(),
+                  name,
+                  modal_saldo,
+                  modal_fisik,
+                  price,
+                  stock
+                });
+
+                saveAppData(db);
+                initVoucherPage();
+                showNotification('Produk kasir berhasil ditambahkan!', 'success');
+              }, true);
+            }, true);
+          }, true);
+        }, true);
       });
-
-      saveAppData(db);
-      initVoucherPage();
-      alert('Master voucher berhasil ditambahkan!');
     };
   }
 }
 
-function setupTarikSetorForm() {
-  const form = document.getElementById('tarik-setor-form');
-  if (form) {
-    form.onsubmit = (e) => {
-      e.preventDefault();
-      const dateVal = document.getElementById('ts-date').value;
-      const accountId = document.getElementById('ts-account').value;
-      const service = document.getElementById('ts-service').value;
-      const modal = parseFloat(document.getElementById('ts-admin-bank').value) || 0;
-      const jual = parseFloat(document.getElementById('ts-admin-agen').value) || 0;
-      const payMethod = document.getElementById('ts-pay-method').value;
-      const customer = document.getElementById('ts-customer').value;
-      const notes = document.getElementById('ts-notes').value || service;
+function updateStock(vouchId) {
+  const db = getAppData();
+  const vouch = db.vouchers.find(v => String(v.id) === String(vouchId));
+  if (!vouch) return;
 
-      if (payMethod === 'Hutang' && !customer) {
-        alert('Nama pelanggan wajib diisi jika transaksi berstatus Hutang!');
-        return;
-      }
+  showPrompt('Ubah Stok Barang', `Atur perubahan stok untuk "${vouch.name}".\n(Gunakan tanda minus "-" untuk mengurangi stok, contoh: -2 atau 5):`, '0', (val) => {
+    const perubahan = parseInt(val);
+    if (isNaN(perubahan)) return;
 
-      const db = getAppData();
-      const acc = db.accounts.find(a => a.id === accountId);
-      if (!acc) {
-        alert('Silakan pilih aplikasi/rekening terlebih dahulu!');
-        return;
-      }
+    vouch.stock = Number(vouch.stock || 0) + perubahan;
+    if (vouch.stock < 0) vouch.stock = 0; // Mencegah stok minus
 
-      const profit = jual - modal;
-      const newTx = {
-        id: 'tx_' + Date.now(),
-        notes: `${service} (${acc.name}) [${payMethod}] - ${notes}`,
-        amount: modal,
-        admin_fee: jual,
-        cost_price: modal,
-        profit,
-        date: new Date(dateVal).toISOString(),
-        status: payMethod === 'Hutang' ? 'Hutang' : 'Success'
-      };
-
-      db.transactions.push(newTx);
-
-      if (payMethod === 'Hutang') {
-        db.debts.push({
-          id: 'debt_' + Date.now(),
-          customer,
-          amount: jual,
-          description: newTx.notes,
-          date: new Date(dateVal).toISOString()
-        });
-      } else {
-        if (service.toLowerCase().includes('tarik')) {
-          acc.balance -= modal;
-        } else {
-          acc.balance += modal;
-        }
-      }
-
-      saveAppData(db);
-      loadDashboardData();
-      form.reset();
-      initTarikSetorPage();
-      alert('Transaksi berhasil disimpan!');
-      switchPage('transactions');
-    };
-  }
+    saveAppData(db);
+    initVoucherPage();
+    showNotification(`Stok ${vouch.name} berhasil diperbarui!`, 'success');
+  });
 }
 
-function setupPpobForm() {
-  const form = document.getElementById('ppob-form');
-  if (form) {
-    form.onsubmit = (e) => {
-      e.preventDefault();
-      const accountId = document.getElementById('ppob-account').value;
-      const service = document.getElementById('ppob-service').value;
-      const target = document.getElementById('ppob-target').value;
-      const modal = parseFloat(document.getElementById('ppob-modal').value) || 0;
-      const jual = parseFloat(document.getElementById('ppob-jual').value) || 0;
-      const payMethod = document.getElementById('ppob-pay-method').value;
-      const customer = document.getElementById('ppob-customer').value;
+function deleteProduct(vouchId) {
+  const db = getAppData();
+  const vouch = db.vouchers.find(v => String(v.id) === String(vouchId));
+  if (!vouch) return;
 
-      if (payMethod === 'Hutang' && !customer) {
-        alert('Nama pelanggan wajib diisi jika transaksi berstatus Hutang!');
-        return;
-      }
-
-      const db = getAppData();
-      const acc = db.accounts.find(a => a.id === accountId);
-      if (!acc) {
-        alert('Silakan pilih aplikasi/sumber saldo terlebih dahulu!');
-        return;
-      }
-
-      const profit = jual - modal;
-      const newTx = {
-        id: 'tx_' + Date.now(),
-        notes: `PPOB: ${service} (${target}) via ${acc.name} [${payMethod}]`,
-        amount: modal,
-        admin_fee: jual,
-        cost_price: modal,
-        profit,
-        date: new Date().toISOString(),
-        status: payMethod === 'Hutang' ? 'Hutang' : 'Success'
-      };
-
-      db.transactions.push(newTx);
-
-      if (payMethod === 'Hutang') {
-        db.debts.push({
-          id: 'debt_' + Date.now(),
-          customer,
-          amount: jual,
-          description: newTx.notes,
-          date: new Date().toISOString()
-        });
-      } else {
-        acc.balance -= modal;
-      }
-
-      saveAppData(db);
-      loadDashboardData();
-      form.reset();
-      initPpobPage();
-      alert('Transaksi PPOB berhasil disimpan!');
-      switchPage('transactions');
-    };
-  }
+  showConfirm('Hapus Produk', `Yakin ingin menghapus produk "${vouch.name}" dari daftar kasir?`, () => {
+    db.vouchers = db.vouchers.filter(v => String(v.id) !== String(vouchId));
+    saveAppData(db);
+    initVoucherPage();
+    showNotification('Produk berhasil dihapus!', 'success');
+  }, true);
 }
 
 function setupVoucherForm() {
   const form = document.getElementById('sell-voucher-form');
-  if (form) {
-    form.onsubmit = (e) => {
-      e.preventDefault();
-      const vouchId = document.getElementById('vouch-select-item').value;
-      const accountId = document.getElementById('vouch-select-account').value;
-      const qty = parseInt(document.getElementById('vouch-qty').value) || 1;
-      const payMethod = document.getElementById('vouch-pay-method').value;
-      const customerName = document.getElementById('vouch-customer-name').value;
+  if (!form) return;
 
-      if (payMethod === 'Hutang' && !customerName) {
-        alert('Nama pelanggan wajib diisi jika transaksi berstatus Hutang!');
-        return;
-      }
+  form.onsubmit = (e) => {
+    e.preventDefault();
+    const vouchId = document.getElementById('vouch-select-item').value;
+    const accountId = document.getElementById('vouch-select-account').value;
+    const qty = parseInt(document.getElementById('vouch-qty').value) || 1;
+    const payMethod = document.getElementById('vouch-pay-method').value;
+    const customerName = document.getElementById('vouch-customer-name').value.trim();
 
-      const db = getAppData();
-      const vouch = db.vouchers.find(v => v.id === vouchId);
-      const acc = db.accounts.find(a => a.id === accountId);
+    if (!vouchId || !accountId || !payMethod) {
+      showNotification('Lengkapi semua pilihan form kasir!', 'error');
+      return;
+    }
 
-      if (!vouch || !acc) {
-        alert('Pilih voucher dan aplikasi inject terlebih dahulu!');
-        return;
-      }
+    if (payMethod === 'Hutang' && !customerName) {
+      showNotification('Nama pelanggan wajib diisi jika transaksi berstatus Hutang!', 'error');
+      return;
+    }
 
-      if (vouch.stock < qty) {
-        alert(`Stok voucher ${vouch.name} tidak mencukupi! Sisa stok: ${vouch.stock}`);
-        return;
-      }
+    const db = getAppData();
+    const vouch = db.vouchers.find(v => String(v.id) === String(vouchId));
+    const accInject = db.accounts.find(a => String(a.id) === String(accountId));
+    const receiver = payMethod === 'Hutang' ? null : db.accounts.find(a => String(a.id) === String(payMethod));
 
-      const totalModalSaldo = vouch.modal_saldo * qty;
-      const totalModalFisik = vouch.modal_fisik * qty;
-      const totalJual = vouch.price * qty;
-      const totalProfit = totalJual - (totalModalSaldo + totalModalFisik);
+    if (!vouch || !accInject) {
+      showNotification('Produk atau akun sumber inject tidak ditemukan!', 'error');
+      return;
+    }
 
-      vouch.stock -= qty;
-      acc.balance -= totalModalSaldo;
+    if (payMethod !== 'Hutang' && !receiver) {
+      showNotification('Akun penerima pembayaran tidak ditemukan!', 'error');
+      return;
+    }
 
-      const newTx = {
-        id: 'tx_' + Date.now(),
-        notes: `Voucher: ${vouch.name} (${qty} pcs) via ${acc.name} [${payMethod}]`,
-        amount: totalModalSaldo,
-        admin_fee: totalJual,
-        cost_price: totalModalSaldo + totalModalFisik,
-        profit: totalProfit,
-        date: new Date().toISOString(),
-        status: payMethod === 'Hutang' ? 'Hutang' : 'Success'
-      };
+    if (vouch.stock < qty) {
+      showNotification(`Stok ${vouch.name} tidak mencukupi! Sisa: ${vouch.stock}`, 'error');
+      return;
+    }
 
-      db.transactions.push(newTx);
+    const totalModalSaldo = Number(vouch.modal_saldo || 0) * qty;
+    const totalModalFisik = Number(vouch.modal_fisik || 0) * qty;
+    const totalJual = Number(vouch.price || 0) * qty;
+    const totalProfit = totalJual - (totalModalSaldo + totalModalFisik);
 
-      if (payMethod === 'Hutang') {
-        db.debts.push({
-          id: 'debt_' + Date.now(),
-          customer: customerName,
-          amount: totalJual,
-          description: newTx.notes,
-          date: new Date().toISOString()
-        });
-      }
+    // Cek kecukupan saldo akun inject
+    if ((Number(accInject.balance) || 0) < totalModalSaldo) {
+      showNotification('Saldo akun inject tidak mencukupi untuk modal server!', 'error');
+      return;
+    }
 
-      saveAppData(db);
-      loadDashboardData();
-      form.reset();
-      initVoucherPage();
-      alert('Transaksi penjualan voucher berhasil!');
-      switchPage('transactions');
+    // Cari akun Kas Tunai untuk modal fisik
+    let cashAccount = db.accounts.find(a => a.name.toLowerCase().includes('kas') || a.name.toLowerCase().includes('tunai'));
+    if (!cashAccount && db.accounts.length > 0) {
+      cashAccount = db.accounts[0]; 
+    }
+
+    if (cashAccount && (Number(cashAccount.balance) || 0) < totalModalFisik) {
+      showNotification('Saldo Kas Tunai tidak mencukupi untuk modal fisik voucher!', 'error');
+      return;
+    }
+
+    // 1. Kurangi stok barang
+    vouch.stock -= qty;
+
+    // 2. Potong saldo modal server dari akun inject yang dipilih
+    accInject.balance = (Number(accInject.balance) || 0) - totalModalSaldo;
+
+    // 3. Potong modal fisik dari kas tunai
+    if (cashAccount) {
+      cashAccount.balance = (Number(cashAccount.balance) || 0) - totalModalFisik;
+    }
+
+    // 4. Masukkan uang penjualan ke akun penerima pembayaran
+    if (receiver) {
+      receiver.balance = (Number(receiver.balance) || 0) + totalJual;
+    }
+
+    const txId = 'tx_' + Date.now();
+    const txDate = new Date().toISOString();
+    const debtId = payMethod === 'Hutang' ? 'debt_' + Date.now() : null;
+
+    const newTx = {
+      id: txId,
+      type: 'voucher',
+      accountId: String(accInject.id),
+      cashAccountId: cashAccount ? String(cashAccount.id) : null,
+      payAccountId: receiver ? String(receiver.id) : 'Hutang',
+      voucherId: String(vouch.id),
+      quantity: qty,
+      debtId,
+      notes: `Kasir: ${vouch.name} (${qty} pcs) via ${accInject.name} [Bayar: ${receiver ? receiver.name : 'Hutang'}]`,
+      amount: totalModalSaldo,
+      modal_fisik: totalModalFisik,
+      admin_fee: totalJual,
+      cost_price: totalModalSaldo + totalModalFisik,
+      profit: totalProfit,
+      date: txDate,
+      status: debtId ? 'Hutang' : 'Success'
     };
-  }
+
+    db.transactions.push(newTx);
+
+    if (debtId) {
+      if (!Array.isArray(db.debts)) db.debts = [];
+      db.debts.push({
+        id: debtId,
+        transactionId: txId,
+        customer: customerName,
+        amount: totalJual,
+        description: newTx.notes,
+        date: txDate
+      });
+    }
+
+    saveAppData(db);
+    loadDashboardData();
+    form.reset();
+    initVoucherPage();
+    showNotification('Transaksi kasir berhasil disimpan!', 'success');
+    switchPage('transactions');
+  };
+}
+
+function setupTarikSetorForm() {
+    const form = document.getElementById('tarik-setor-form');
+    if (!form) return;
+
+    form.onsubmit = (e) => {
+        e.preventDefault();
+
+        const dateVal = document.getElementById('ts-date').value;
+        const accountId = document.getElementById('ts-account').value;
+        const service = document.getElementById('ts-service').value;
+        const modal = getCleanNumber(document.getElementById('ts-admin-bank'));
+        const jual = getCleanNumber(document.getElementById('ts-admin-agen'));
+        const payAccountId = document.getElementById('ts-pay-method').value;
+        const customer = document.getElementById('ts-customer').value.trim();
+        const notes = document.getElementById('ts-notes').value || service;
+
+        if (!accountId || !payAccountId) {
+            showNotification('Pilih akun sumber dan penerima!', 'error');
+            return;
+        }
+
+        if (modal <= 0 || jual < modal) {
+            showNotification('Periksa modal dan harga jual!', 'error');
+            return;
+        }
+
+        if (payAccountId === 'Hutang' && !customer) {
+            showNotification('Nama pelanggan wajib diisi!', 'error');
+            return;
+        }
+
+        const db = getAppData();
+        const source = db.accounts.find(a => String(a.id) === String(accountId));
+        const receiver = payAccountId === 'Hutang' ? null : db.accounts.find(a => String(a.id) === String(payAccountId));
+
+        if (!source) {
+            showNotification('Akun sumber tidak ditemukan!', 'error');
+            return;
+        }
+
+        if (payAccountId !== 'Hutang' && !receiver) {
+            showNotification('Akun penerima tidak ditemukan!', 'error');
+            return;
+        }
+
+        const sourceBalance = Number(source.balance) || 0;
+        if (sourceBalance < modal) {
+            showNotification('Saldo sumber tidak mencukupi!', 'error');
+            return;
+        }
+
+        const txId = 'tx_' + Date.now();
+        const txDate = new Date(dateVal || Date.now()).toISOString();
+        const debtId = payAccountId === 'Hutang' ? 'debt_' + Date.now() : null;
+
+        const newTx = {
+            id: txId,
+            type: 'tarik_setor',
+            accountId: String(source.id),
+            payAccountId: receiver ? String(receiver.id) : 'Hutang',
+            debtId,
+            notes: `${service} (${source.name}) - ${notes}`,
+            amount: modal,
+            admin_fee: jual,
+            cost_price: modal,
+            profit: jual - modal,
+            date: txDate,
+            status: debtId ? 'Hutang' : 'Success'
+        };
+
+        source.balance = sourceBalance - modal;
+
+        if (receiver) {
+            receiver.balance = (Number(receiver.balance) || 0) + jual;
+        }
+
+        if (debtId) {
+            if (!Array.isArray(db.debts)) db.debts = [];
+            db.debts.push({
+                id: debtId,
+                transactionId: txId,
+                customer,
+                amount: jual,
+                description: newTx.notes,
+                date: txDate
+            });
+        }
+
+        db.transactions.push(newTx);
+        saveAppData(db);
+
+        loadDashboardData();
+        form.reset();
+        initTarikSetorPage();
+
+        showNotification('Transaksi berhasil disimpan!', 'success');
+        switchPage('transactions');
+    };
+}
+
+function setupPpobForm() {
+    const form = document.getElementById('ppob-form');
+    if (!form) return;
+
+    form.onsubmit = (e) => {
+        e.preventDefault();
+
+        const accountId = document.getElementById('ppob-account').value;
+        const service = document.getElementById('ppob-service').value;
+        const target = document.getElementById('ppob-target').value.trim();
+        const modal = getCleanNumber(document.getElementById('ppob-modal'));
+        const jual = getCleanNumber(document.getElementById('ppob-jual'));
+        const payMethod = document.getElementById('ppob-pay-method').value;
+        const customer = document.getElementById('ppob-customer').value.trim();
+
+        if (!accountId || !payMethod) {
+            showNotification('Pilih akun sumber dan penerima!', 'error');
+            return;
+        }
+
+        if (modal <= 0 || jual < modal) {
+            showNotification('Periksa modal dan harga jual!', 'error');
+            return;
+        }
+
+        if (payMethod === 'Hutang' && !customer) {
+            showNotification('Nama pelanggan wajib diisi!', 'error');
+            return;
+        }
+
+        const db = getAppData();
+        const source = db.accounts.find(a => String(a.id) === String(accountId));
+        const receiver = payMethod === 'Hutang' ? null : db.accounts.find(a => String(a.id) === String(payMethod));
+
+        if (!source) {
+            showNotification('Akun sumber tidak ditemukan!', 'error');
+            return;
+        }
+
+        if (payMethod !== 'Hutang' && !receiver) {
+            showNotification('Akun penerima tidak ditemukan!', 'error');
+            return;
+        }
+
+        const sourceBalance = Number(source.balance) || 0;
+        if (sourceBalance < modal) {
+            showNotification('Saldo sumber tidak mencukupi!', 'error');
+            return;
+        }
+
+        const txId = 'tx_' + Date.now();
+        const txDate = new Date().toISOString();
+        const debtId = payMethod === 'Hutang' ? 'debt_' + Date.now() : null;
+
+        const newTx = {
+            id: txId,
+            type: 'ppob',
+            accountId: String(source.id),
+            payAccountId: receiver ? String(receiver.id) : 'Hutang',
+            debtId,
+            notes: `PPOB: ${service} (${target}) via ${source.name}`,
+            amount: modal,
+            admin_fee: jual,
+            cost_price: modal,
+            profit: jual - modal,
+            date: txDate,
+            status: debtId ? 'Hutang' : 'Success'
+        };
+
+        source.balance = sourceBalance - modal;
+
+        if (receiver) {
+            receiver.balance = (Number(receiver.balance) || 0) + jual;
+        }
+
+        if (debtId) {
+            if (!Array.isArray(db.debts)) db.debts = [];
+            db.debts.push({
+                id: debtId,
+                transactionId: txId,
+                customer,
+                amount: jual,
+                description: newTx.notes,
+                date: txDate
+            });
+        }
+
+        db.transactions.push(newTx);
+        saveAppData(db);
+
+        loadDashboardData();
+        form.reset();
+        initPpobPage();
+
+        showNotification('Transaksi PPOB berhasil disimpan!', 'success');
+        switchPage('transactions');
+    };
 }
 
 function loadDebtsPage() {
@@ -375,13 +727,98 @@ function loadDebtsPage() {
 }
 
 function payDebt(debtId) {
-  if (!confirm('Tandai hutang ini sudah lunas?')) return;
+    const db = getAppData();
+    const debt = db.debts.find(d => d.id === debtId);
 
-  const db = getAppData();
-  db.debts = db.debts.filter(d => d.id !== debtId);
-  saveAppData(db);
-  loadDebtsPage();
-  alert('Hutang berhasil dilunasi!');
+    if (!debt) return;
+
+    const oldModal = document.getElementById('pay-debt-modal');
+    if (oldModal) oldModal.remove();
+
+    const modal = document.createElement('div');
+    modal.id = 'pay-debt-modal';
+    modal.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(0,0,0,0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        padding: 20px;
+    `;
+
+    modal.innerHTML = `
+        <div style="
+            background: #1e293b;
+            padding: 22px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 380px;
+            color: white;
+        ">
+            <h3 style="margin-bottom: 8px;">Pelunasan Hutang</h3>
+
+            <p style="font-size: 13px; color: #94a3b8; margin-bottom: 16px;">
+                ${debt.customer}<br>
+                Nominal: ${formatRupiah(debt.amount)}
+            </p>
+
+            <label style="display:block; margin-bottom:8px;">
+                Pilih Rekening Penerima
+            </label>
+
+            <select id="debt-pay-account" class="glass-input"
+                style="width:100%; margin-bottom:18px;">
+                <option value="">-- Pilih Rekening --</option>
+                ${db.accounts.map(acc => `
+                    <option value="${acc.id}">${acc.name}</option>
+                `).join('')}
+            </select>
+
+            <div style="display:flex; gap:10px;">
+                <button id="cancel-debt-pay" style="
+                    flex:1; padding:11px; border:0;
+                    border-radius:8px; cursor:pointer;
+                ">Batal</button>
+
+                <button id="confirm-debt-pay" style="
+                    flex:1; padding:11px; border:0;
+                    border-radius:8px; background:#17A897;
+                    color:white; cursor:pointer;
+                ">Konfirmasi</button>
+            </div>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    document.getElementById('cancel-debt-pay').onclick = () => {
+        modal.remove();
+    };
+
+    document.getElementById('confirm-debt-pay').onclick = () => {
+        const accountId = document.getElementById('debt-pay-account').value;
+        const account = db.accounts.find(a => String(a.id) === String(accountId));
+
+        if (!account) {
+            showNotification('Pilih rekening terlebih dahulu!', 'error');
+            return;
+        }
+
+        modal.remove();
+
+        showConfirm('Konfirmasi Pelunasan', `Lunasi hutang ${debt.customer} sebesar ${formatRupiah(debt.amount)} melalui ${account.name}?`, () => {
+            account.balance = (Number(account.balance) || 0) + Number(debt.amount);
+            db.debts = db.debts.filter(d => String(d.id) !== String(debtId));
+
+            saveAppData(db);
+            loadDebtsPage();
+            loadDashboardData();
+
+            showNotification('Hutang berhasil dilunasi!', 'success');
+        }, false);
+    };
 }
 
 function loadDashboardData() {
@@ -450,35 +887,66 @@ function loadTransactionsPage() {
 }
 
 function renderFullTransactionsList(transactions) {
-  const listEl = document.getElementById('full-tx-list');
-  if (!listEl) return;
+  const tbodyEl = document.getElementById('full-tx-table-body');
+  const countEl = document.getElementById('tx-count-label');
+  if (!tbodyEl) return;
 
-  if (!transactions || transactions.length === 0) {
-    listEl.innerHTML = `<p class="empty-state">Belum ada transaksi tercatat.</p>`;
+  const totalData = transactions ? transactions.length : 0;
+  if (countEl) countEl.innerText = `Menampilkan total ${totalData} data`;
+
+  if (!transactions || totalData === 0) {
+    tbodyEl.innerHTML = `<tr><td colspan="10" class="empty-state" style="text-align: center; padding: 24px;">Belum ada transaksi tercatat.</td></tr>`;
     return;
   }
 
   const sortedTx = [...transactions].reverse();
-  listEl.innerHTML = sortedTx.map(tx => `
-    <div style="display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.05);">
-      <div>
-        <strong style="font-size: 14px; display: block;">${tx.notes} ${tx.status === 'Hutang' ? '<span style="color:#f87171; font-size:10px;">(Hutang)</span>' : ''}</strong>
-        <span style="font-size: 11px; color: var(--text-muted);">${new Date(tx.date).toLocaleString('id-ID')}</span>
-      </div>
-      <div style="text-align: right; display: flex; align-items: center; gap: 8px;">
-        <div>
-          <span style="font-size: 14px; font-weight: 600; color: #34d399; display: block;">+${formatRupiah(tx.admin_fee)}</span>
-          <span style="font-size: 10px; color: var(--text-muted);">Profit: ${formatRupiah(tx.profit)}</span>
-        </div>
-        <button onclick="printReceipt('${tx.id}')" style="background: var(--primary-light); border: none; color: var(--primary-color); cursor: pointer; padding: 6px 10px; border-radius: 6px; font-size: 12px;" title="Cetak Struk">
-          <i class="fa-solid fa-receipt"></i>
-        </button>
-        <button onclick="deleteTransaction('${tx.id}')" style="background: transparent; border: none; color: #f87171; cursor: pointer; padding: 6px;" title="Hapus">
-          <i class="fa-solid fa-trash-can"></i>
-        </button>
-      </div>
-    </div>
-  `).join('');
+  tbodyEl.innerHTML = sortedTx.map((tx, idx) => {
+    const txDate = new Date(tx.date);
+    const dateFormatted = `${String(txDate.getDate()).padStart(2, '0')}/${String(txDate.getMonth() + 1).padStart(2, '0')}/${txDate.getFullYear()} ${String(txDate.getHours()).padStart(2, '0')}:${String(txDate.getMinutes()).padStart(2, '0')}`;
+    
+    const jual = Number(tx.admin_fee) || 0;
+    const modal = Number(tx.cost_price) || Number(tx.amount) || 0;
+    const profit = Number(tx.profit) || 0;
+
+    let aplikasi = "SakaPay";
+    if (tx.notes && tx.notes.includes("via")) {
+      aplikasi = tx.notes.split("via")[1].split("[")[0].trim();
+    }
+    const layanan = tx.notes ? tx.notes.split("(")[0].trim() : "-";
+    const keterangan = tx.status === 'Hutang' ? 'HUTANG (Belum Lunas)' : '-';
+
+    return `
+      <tr>
+        <td style="text-align: center;">
+          <input type="checkbox" class="tx-checkbox" value="${tx.id}" style="accent-color: var(--primary-color); cursor: pointer;">
+        </td>
+        <td>
+          <strong style="color: #38bdf8; display: block; font-size: 11px;">${tx.id.toUpperCase()}</strong>
+          <span style="font-size: 10px; color: var(--text-muted);">${dateFormatted}</span>
+        </td>
+        <td>
+          <span style="display: block; font-weight: 600;">Saka</span>
+          <span style="font-size: 10px; color: var(--text-muted);">Local Device</span>
+        </td>
+        <td>${aplikasi}</td>
+        <td>${layanan}</td>
+        <td><span style="color: ${tx.status === 'Hutang' ? '#f87171' : 'inherit'};">${keterangan}</span></td>
+        <td style="text-align: right; font-weight: 600; color: #34d399;">${formatRupiah(jual)}</td>
+        <td style="text-align: right; color: var(--text-muted);">${formatRupiah(modal)}</td>
+        <td style="text-align: right; font-weight: 600; color: #34d399;">${formatRupiah(profit)}</td>
+        <td>
+          <div class="tx-action-btns">
+            <button class="btn-receipt" onclick="printReceipt('${tx.id}')" title="Cetak Struk">
+              <i class="fa-solid fa-receipt"></i>
+            </button>
+            <button class="btn-delete" onclick="deleteTransaction('${tx.id}')" title="Hapus">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
 }
 
 function setupTxPageListeners() {
@@ -488,7 +956,7 @@ function setupTxPageListeners() {
       const keyword = e.target.value.toLowerCase();
       const db = getAppData();
       const filtered = db.transactions.filter(tx => 
-        tx.notes.toLowerCase().includes(keyword)
+        tx.notes.toLowerCase().includes(keyword) || tx.id.toLowerCase().includes(keyword)
       );
       renderFullTransactionsList(filtered);
     };
@@ -524,7 +992,7 @@ function exportTransactionsToExcel(type) {
   }
 
   if (filteredTx.length === 0) {
-    alert('Tidak ada data transaksi pada periode ini.');
+    showNotification('Tidak ada data transaksi pada periode ini.', 'error');
     return;
   }
 
@@ -573,18 +1041,67 @@ function exportTransactionsToExcel(type) {
 
   const filename = `SakaPay_Riwayat_${type === 'daily' ? 'Harian' : 'Bulanan'}_${now.toISOString().split('T')[0]}.xlsx`;
   XLSX.writeFile(wb, filename);
-  alert('File Excel berhasil diexport!');
+  showNotification('File Excel berhasil diexport!', 'success');
 }
 
 function deleteTransaction(txId) {
-  if (!confirm('Yakin ingin menghapus transaksi ini?')) return;
+    showConfirm('Konfirmasi Hapus', 'Hapus transaksi ini dan kembalikan seluruh saldo & stok ke awal?', () => {
+        const db = getAppData();
+        const tx = db.transactions.find(item => String(item.id) === String(txId));
 
-  const db = getAppData();
-  db.transactions = db.transactions.filter(tx => tx.id !== txId);
-  saveAppData(db);
-  
-  loadDashboardData();
-  loadTransactionsPage();
+        if (!tx) {
+            showNotification('Transaksi tidak ditemukan!', 'error');
+            return;
+        }
+
+        // 1. Kembalikan modal saldo server ke akun inject asal
+        const sourceInject = db.accounts.find(a => String(a.id) === String(tx.accountId));
+        if (sourceInject) {
+            const modalSaldo = Number(tx.amount || 0);
+            sourceInject.balance = (Number(sourceInject.balance) || 0) + modalSaldo;
+        }
+
+        // 2. Kembalikan modal fisik ke akun Kas Tunai
+        if (tx.modal_fisik && tx.cashAccountId) {
+            const cashAcc = db.accounts.find(a => String(a.id) === String(tx.cashAccountId));
+            if (cashAcc) {
+                cashAcc.balance = (Number(cashAcc.balance) || 0) + Number(tx.modal_fisik);
+            }
+        }
+
+        // 3. Tarik kembali uang penjualan dari akun penerima
+        if (tx.payAccountId && tx.payAccountId !== 'Hutang' && tx.payAccountId !== 'Cash') {
+            const receiver = db.accounts.find(a => String(a.id) === String(tx.payAccountId));
+            if (receiver) {
+                const jual = Number(tx.admin_fee || 0);
+                receiver.balance = (Number(receiver.balance) || 0) - jual;
+            }
+        }
+
+        // 4. Kembalikan stok barang
+        if (tx.voucherId && Array.isArray(db.vouchers)) {
+            const voucher = db.vouchers.find(v => String(v.id) === String(tx.voucherId));
+            if (voucher) {
+                voucher.stock = Number(voucher.stock || 0) + Number(tx.quantity || 1);
+            }
+        }
+
+        // 5. Hapus catatan hutang jika ada
+        if (tx.debtId && Array.isArray(db.debts)) {
+            db.debts = db.debts.filter(d => String(d.id) !== String(tx.debtId));
+        }
+
+        db.transactions = db.transactions.filter(item => String(item.id) !== String(txId));
+
+        saveAppData(db);
+
+        loadDashboardData();
+        loadTransactionsPage();
+        loadBalancePage();
+        loadDebtsPage();
+
+        showNotification('Transaksi dihapus, seluruh saldo & stok dikembalikan!', 'success');
+    }, true);
 }
 
 function printReceipt(txId) {
@@ -605,10 +1122,10 @@ Total   : ${formatRupiah(tx.admin_fee)}
     Transaksi di SakaPay  
 ==========================`;
 
-  if (confirm(strukText + '\n\nTekan OK untuk salin teks struk ke clipboard.')) {
+  showConfirm('Cetak Struk', 'Salin teks struk ke clipboard?', () => {
     navigator.clipboard.writeText(strukText);
-    alert('Struk berhasil disalin!');
-  }
+    showNotification('Struk berhasil disalin!', 'success');
+  }, false);
 }
 
 function loadBalancePage() {
@@ -618,10 +1135,12 @@ function loadBalancePage() {
   if (!gridEl || !selectEl) return;
 
   gridEl.innerHTML = db.accounts.map(acc => `
-    <div class="metric-card glass-card">
+    <div class="metric-card glass-card" style="position: relative;">
       <div class="metric-header">
         <span>${acc.name}</span>
-        <i class="fa-solid fa-wallet icon-teal"></i>
+        <button onclick="deleteAccount('${acc.id}')" style="background: transparent; border: none; color: #f87171; cursor: pointer; font-size: 13px;" title="Hapus Akun">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
       </div>
       <h3 class="metric-value">${formatRupiah(acc.balance)}</h3>
       <span class="metric-sub text-muted">ID: ${acc.id}</span>
@@ -641,15 +1160,15 @@ function setupBalanceFormListeners() {
     adjustForm.onsubmit = (e) => {
       e.preventDefault();
       const accountId = document.getElementById('adj-account-id').value;
-      const newBalance = parseFloat(document.getElementById('adj-new-balance').value);
+      const newBalance = getCleanNumber(document.getElementById('adj-new-balance'));
       const notes = document.getElementById('adj-notes').value;
 
       const db = getAppData();
-      const acc = db.accounts.find(a => a.id === accountId);
+      const acc = db.accounts.find(a => String(a.id) === String(accountId));
       if (acc) {
         acc.balance = newBalance;
         saveAppData(db);
-        alert(`Saldo ${acc.name} berhasil diperbarui!`);
+        showNotification(`Saldo ${acc.name} berhasil diperbarui!`, 'success');
         loadDashboardData();
         loadBalancePage();
         adjustForm.reset();
@@ -657,21 +1176,54 @@ function setupBalanceFormListeners() {
     };
   }
 
+  formatNumberInput(document.getElementById('adj-new-balance'));
+
   const btnAddAccount = document.getElementById('btn-add-account');
   if (btnAddAccount) {
     btnAddAccount.onclick = () => {
-      const name = prompt('Nama Rekening / Dompet Baru:');
-      if (!name) return;
-      const initialBalance = parseFloat(prompt('Saldo Awal (Rp):', '0')) || 0;
+      showPrompt('Tambah Rekening Baru', 'Masukkan Nama Rekening / Dompet Baru (Contoh: DANA / BCA / OVO):', '', (name) => {
+        if (!name) return;
+        showPrompt('Saldo Awal', 'Masukkan Saldo Awal (Rp):', '0', (initBal) => {
+          const initialBalance = parseFloat(initBal) || 0;
 
-      const db = getAppData();
-      db.accounts.push({ id: 'acc_' + Date.now(), name, balance: initialBalance });
+          const db = getAppData();
+          db.accounts.push({ 
+            id: 'acc_' + Date.now(), 
+            name: name.trim(), 
+            balance: initialBalance 
+          });
+          
+          saveAppData(db);
+          loadDashboardData();
+          loadBalancePage();
+          showNotification('Akun / rekening baru berhasil ditambahkan!', 'success');
+        }, true);
+      });
+    };
+  }
+}
+
+function deleteAccount(accountId) {
+  const db = getAppData();
+  
+  if (db.accounts.length <= 1) {
+    showNotification('Minimal harus ada 1 akun/rekening aktif di dalam sistem!', 'error');
+    return;
+  }
+
+  const accToDelete = db.accounts.find(a => String(a.id) === String(accountId));
+  if (!accToDelete) {
+    showNotification('Akun tidak ditemukan!', 'error');
+    return;
+  }
+
+  showConfirm('Hapus Akun', `Yakin ingin menghapus akun "${accToDelete.name}"? Pastikan tidak ada transaksi aktif yang mengikat ke akun ini.`, () => {
+      db.accounts = db.accounts.filter(a => String(a.id) !== String(accountId));
       saveAppData(db);
       loadDashboardData();
       loadBalancePage();
-      alert('Akun baru berhasil ditambahkan!');
-    };
-  }
+      showNotification('Akun berhasil dihapus!', 'success');
+  }, true);
 }
 
 function loadFinancePage() {
@@ -716,40 +1268,44 @@ function setupExpenseListeners() {
   const btnAdd = document.getElementById('btn-add-expense');
   if (btnAdd) {
     btnAdd.onclick = () => {
-      const category = prompt('Pilih Kategori (Ketik angka):\n1. Operasional\n2. Pengambilan Pribadi (Prive)\n3. Tambah Modal', '1');
-      if (!category) return;
+      showPrompt('Catat Pengeluaran', 'Pilih Kategori (Ketik angka):\n1. Operasional\n2. Pengambilan Pribadi (Prive)\n3. Tambah Modal', '1', (category) => {
+        if (!category) return;
 
-      let catKey = 'operasional';
-      if (category === '2') catKey = 'pengambilan_pribadi';
-      else if (category === '3') catKey = 'tambah_modal';
+        let catKey = 'operasional';
+        if (category === '2') catKey = 'pengambilan_pribadi';
+        else if (category === '3') catKey = 'tambah_modal';
 
-      const desc = prompt('Keterangan / Keperluan:', 'Bayar listrik');
-      if (!desc) return;
+        showPrompt('Keterangan', 'Keterangan / Keperluan (Contoh: Bayar listrik):', '', (desc) => {
+          if (!desc) return;
 
-      const amount = parseFloat(prompt('Nominal (Rp):', '50000'));
-      if (!amount || isNaN(amount)) return;
+          showPrompt('Nominal', 'Nominal Pengeluaran (Rp):', '50000', (amt) => {
+            const amount = parseFloat(amt);
+            if (!amount || isNaN(amount)) return;
 
-      const db = getAppData();
-      const accountName = db.accounts.length > 0 ? db.accounts[0].name : 'Kas Tunai';
-      
-      db.expenses.push({
-        id: 'exp_' + Date.now(),
-        category: catKey,
-        description: desc,
-        amount,
-        account_name: accountName,
-        date: new Date().toISOString()
+            const db = getAppData();
+            const accountName = db.accounts.length > 0 ? db.accounts[0].name : 'Kas Tunai';
+            
+            db.expenses.push({
+              id: 'exp_' + Date.now(),
+              category: catKey,
+              description: desc,
+              amount,
+              account_name: accountName,
+              date: new Date().toISOString()
+            });
+
+            if (db.accounts.length > 0) {
+              if (catKey === 'tambah_modal') db.accounts[0].balance += amount;
+              else db.accounts[0].balance -= amount;
+            }
+
+            saveAppData(db);
+            loadDashboardData();
+            loadFinancePage();
+            showNotification('Catatan keuangan berhasil disimpan!', 'success');
+          }, true);
+        });
       });
-
-      if (db.accounts.length > 0) {
-        if (catKey === 'tambah_modal') db.accounts[0].balance += amount;
-        else db.accounts[0].balance -= amount;
-      }
-
-      saveAppData(db);
-      loadDashboardData();
-      loadFinancePage();
-      alert('Catatan keuangan berhasil disimpan!');
     };
   }
 }
@@ -785,16 +1341,18 @@ function setupCustomerListeners() {
   const btnAdd = document.getElementById('btn-add-customer');
   if (btnAdd) {
     btnAdd.onclick = () => {
-      const name = prompt('Nama Pelanggan:');
-      if (!name) return;
-      const phone = prompt('Nomor WhatsApp (Contoh: 628123456789):', '62');
-      if (!phone) return;
+      showPrompt('Tambah Pelanggan', 'Nama Pelanggan:', '', (name) => {
+        if (!name) return;
+        showPrompt('Nomor WhatsApp', 'Nomor WhatsApp (Contoh: 628123456789):', '62', (phone) => {
+          if (!phone) return;
 
-      const db = getAppData();
-      db.customers.push({ id: 'cust_' + Date.now(), name, phone });
-      saveAppData(db);
-      loadCustomersPage();
-      alert('Pelanggan berhasil ditambahkan!');
+          const db = getAppData();
+          db.customers.push({ id: 'cust_' + Date.now(), name, phone });
+          saveAppData(db);
+          loadCustomersPage();
+          showNotification('Pelanggan berhasil ditambahkan!', 'success');
+        });
+      });
     };
   }
 }

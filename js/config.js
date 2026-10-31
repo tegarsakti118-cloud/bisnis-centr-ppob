@@ -29,7 +29,19 @@ function getAppData() {
     localStorage.setItem(DB_KEY, JSON.stringify(defaultData));
     return defaultData;
   }
-  return JSON.parse(data);
+  try {
+    const parsed = JSON.parse(data);
+    // Pastikan struktur dasar selalu ada untuk mencegah error pada data lama
+    if (!parsed.accounts) parsed.accounts = defaultData.accounts;
+    if (!parsed.transactions) parsed.transactions = [];
+    if (!parsed.expenses) parsed.expenses = [];
+    if (!parsed.customers) parsed.customers = [];
+    if (!parsed.debts) parsed.debts = [];
+    if (!parsed.vouchers) parsed.vouchers = defaultData.vouchers;
+    return parsed;
+  } catch (e) {
+    return defaultData;
+  }
 }
 
 function saveAppData(data) {
