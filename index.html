@@ -8,6 +8,30 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Supabase JS Client CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  
+  <!-- Skrip Proteksi & Sesi Cloud -->
+  <script>
+    const SUPABASE_URL = 'https://qdnegvyomibqjuspjidk.supabase.co';
+    const SUPABASE_KEY = 'sb_publishable_fOUkYi-g2j6POK-g4Oaqqw__uu5592_';
+    const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // Proteksi Halaman Utama
+    sbClient.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        window.location.href = 'login.html';
+      }
+    });
+
+    // Fungsi Logout Global
+    async function handleLogout() {
+      await sbClient.auth.signOut();
+      window.location.href = 'login.html';
+    }
+  </script>
+
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
@@ -250,7 +274,7 @@
 
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-mobile-screen"></i> Nomor Tujuan / ID Pelanggan</label>
-                <input type="text" id="ppob-target" class="glass-input" placeholder="No HP / No Meter / ID Pelanggan" required>
+                <input type="tel" id="ppob-target" class="glass-input" placeholder="No HP / No Meter / ID Pelanggan" required>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
@@ -530,6 +554,7 @@
 
   </div>
 
+  
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
 </body>
