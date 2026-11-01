@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Password Baru - SakaPay v2.1</title>
+  <title>Password Baru - Nexora </title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -11,6 +11,7 @@
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase.js"></script>
+  <script src="js/auth-ui.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; }
@@ -73,7 +74,7 @@
       <a href="login.html">Kembali ke Login</a>
     </div>
 
-    <div class="version-text">SakaPay Business Center (Cloud)</div>
+    <div class="version-text">Nexora Business Center (Cloud)</div>
   </div>
 
   <script>
@@ -130,23 +131,23 @@
     async function processReset() {
       const p1 = document.getElementById('new-password').value;
       const p2 = document.getElementById('new-password2').value;
-      if (!p1 || !p2) return alert('Semua kolom wajib diisi!');
-      if (p1.length < 6) return alert('Password minimal 6 karakter.');
-      if (p1 !== p2) return alert('Password dan ulangi password tidak sama.');
+      if (!p1 || !p2) return notify('Semua kolom wajib diisi.', 'warning');
+      if (p1.length < 6) return notify('Password minimal 6 karakter.', 'warning');
+      if (p1 !== p2) return notify('Password dan ulangi password tidak sama.', 'warning');
 
       setBusy(true);
       try {
         const { error } = await sbAuth.auth.updateUser({ password: p1 });
         if (error) {
-          alert('Gagal mengganti password: ' + error.message);
+          notify(authMessage(error), 'error');
           setBusy(false);
           return;
         }
         await sbAuth.auth.signOut(); // paksa login ulang dengan password baru
-        alert('Password berhasil diganti! Silakan masuk dengan password baru.');
+        await notify('Password berhasil diganti! Silakan masuk dengan password baru.', 'success', 2400);
         window.location.replace(LOGIN_URL);
       } catch (err) {
-        alert('Gagal mengganti password: ' + (err.message || err));
+        notify(authMessage(err), 'error');
         setBusy(false);
       }
     }

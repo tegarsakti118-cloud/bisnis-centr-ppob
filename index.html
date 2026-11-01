@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SakaPay Business Center</title>
+  <title>Nexora </title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -32,40 +32,45 @@
 
     <!-- Sidebar Kiri (Menu Pendukung) -->
     <aside id="sidebar" class="sidebar glass-card">
-      <div class="brand">
-        <i class="fa-solid fa-wallet brand-icon"></i>
-        <div class="brand-text">
-          <span class="brand-title">SakaPay</span>
-          <span class="brand-subtitle">Menu Pendukung</span>
+      <div class="sidebar-top">
+        <div class="user-profile-widget">
+          <div class="avatar"><i class="fa-solid fa-user-shield"></i></div>
+          <div class="user-info">
+            <span class="user-name">Owner Nexora</span>
+            <span class="user-role">Cloud</span>
+          </div>
         </div>
+
+        <div class="brand">
+          <i class="fa-solid fa-wallet brand-icon"></i>
+          <div class="brand-text">
+            <span class="brand-title">Nexora</span>
+            <span class="brand-subtitle">Menu Pendukung</span>
+          </div>
+        </div>
+
+        <nav class="nav-menu">
+          <a href="#debts" class="nav-link" data-page="debts">
+            <i class="fa-solid fa-book-bookmark"></i> <span>Catatan Hutang</span>
+          </a>
+          <a href="#finance" class="nav-link" data-page="finance">
+            <i class="fa-solid fa-coins"></i> <span>Finance / Keuangan</span>
+          </a>
+          <a href="#balances" class="nav-link" data-page="balances">
+            <i class="fa-solid fa-vault"></i> <span>Balance Mgmt</span>
+          </a>
+          <a href="#customers" class="nav-link" data-page="customers">
+            <i class="fa-solid fa-users"></i> <span>Customers</span>
+          </a>
+          <a href="#transactions" class="nav-link" data-page="transactions">
+            <i class="fa-solid fa-file-export"></i> <span>Riwayat & Export</span>
+          </a>
+        </nav>
       </div>
 
-      <nav class="nav-menu">
-        <a href="#debts" class="nav-link" data-page="debts">
-          <i class="fa-solid fa-book-bookmark"></i> <span>Catatan Hutang</span>
-        </a>
-        <a href="#finance" class="nav-link" data-page="finance">
-          <i class="fa-solid fa-coins"></i> <span>Finance / Keuangan</span>
-        </a>
-        <a href="#balances" class="nav-link" data-page="balances">
-          <i class="fa-solid fa-vault"></i> <span>Balance Mgmt</span>
-        </a>
-        <a href="#customers" class="nav-link" data-page="customers">
-          <i class="fa-solid fa-users"></i> <span>Customers</span>
-        </a>
-        <a href="#transactions" class="nav-link" data-page="transactions">
-          <i class="fa-solid fa-file-export"></i> <span>Riwayat & Export</span>
-        </a>
-      </nav>
-
-      <div class="user-profile-widget">
-        <div class="avatar"><i class="fa-solid fa-user-shield"></i></div>
-        <div class="user-info">
-          <span class="user-name">Owner SakaPay</span>
-          <span class="user-role">Cloud</span>
-        </div>
-        <button type="button" id="btn-logout" class="btn-logout" onclick="handleLogout()" title="Keluar">
-          <i class="fa-solid fa-right-from-bracket"></i>
+      <div class="sidebar-bottom">
+        <button type="button" id="btn-logout" class="btn-logout-full" onclick="confirmLogout()">
+          <i class="fa-solid fa-right-from-bracket"></i> <span>Keluar</span>
         </button>
       </div>
     </aside>
@@ -78,7 +83,7 @@
         <button id="hamburger-btn" class="hamburger-btn" onclick="toggleSidebar()">
           <i class="fa-solid fa-bars"></i>
         </button>
-        <span class="top-bar-title">SakaPay Business Center</span>
+        <span class="top-bar-title">Nexora Business Center</span>
       </header>
 
       <div id="content-area" class="content-body" style="padding-top: 10px;">

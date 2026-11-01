@@ -1,5 +1,5 @@
 // ==========================================
-// SAKAPAY v2.1 - APP ENGINE (SUPABASE CLOUD)
+// NEXORA v2.1 - APP ENGINE (SUPABASE CLOUD)
 // Urutan <script> di index.html:
 //   CDN supabase-js -> js/supabase.js -> js/config.js -> js/app.js
 // ==========================================
@@ -14,7 +14,8 @@ let appData = {
   vouchers: [],
   debts: [],
   expenses: [],
-  customers: []
+  customers: [],
+  debtPayments: []
 };
 
 let currentUserId = null;
@@ -23,7 +24,9 @@ let revenueChart = null;
 let txSearchTerm = '';
 let uiBound = false;
 
-const CLOUD_TABLES = ['accounts', 'transactions', 'vouchers', 'debts', 'expenses', 'customers'];
+const CLOUD_TABLES = ['accounts', 'transactions', 'vouchers', 'debts', 'expenses', 'customers', 'debt_payments'];
+// Nama tabel di database -> nama properti di appData
+const TABLE_KEY = { debt_payments: 'debtPayments' };
 
 document.addEventListener('DOMContentLoaded', bootApp);
 
@@ -82,7 +85,7 @@ async function bootApp() {
 function renderUserWidget() {
   const nameEl = document.querySelector('.user-name');
   const roleEl = document.querySelector('.user-role');
-  if (nameEl) nameEl.textContent = currentUserEmail || 'Owner SakaPay';
+  if (nameEl) nameEl.textContent = currentUserEmail || 'Owner Nexora';
   if (roleEl) roleEl.textContent = 'Cloud - Terhubung';
 }
 
@@ -116,7 +119,7 @@ async function fetchCloudData() {
       failed.push(r.table);
       if (isAuthError(r.error)) authFailed = true;
     } else {
-      appData[r.table] = r.data;
+      appData[TABLE_KEY[r.table] || r.table] = r.data;
     }
   });
 
@@ -130,6 +133,7 @@ async function fetchCloudData() {
   appData.transactions.sort(byDate);
   appData.debts.sort(byDate);
   appData.expenses.sort(byDate);
+  appData.debtPayments.sort(byDate);
 
   if (failed.length) {
     showNotification(`Gagal memuat tabel: ${failed.join(', ')}. Cek nama tabel & kebijakan RLS di Supabase.`, 'error');
@@ -301,6 +305,7 @@ function showConfirm(title, message, onConfirm, isDanger = false) {
 // onSubmit(values) -> boleh async; return false = modal tetap terbuka.
 function showFormModal({ title, icon = 'fa-solid fa-pen-to-square', fields, submitText = 'Simpan', onSubmit }) {
   const fieldsHtml = fields.map((f) => {
+    if (f.type === 'info') return `<div class="fm-info">${escapeHtml(f.text)}</div>`;
     const id = `fm-${f.id}`;
     let control;
     if (f.type === 'select') {
@@ -329,7 +334,10 @@ function showFormModal({ title, icon = 'fa-solid fa-pen-to-square', fields, subm
   `, 'rgba(52,211,153,0.4)');
 
   fields.forEach((f) => {
-    if (f.type === 'number') formatNumberInput(modal.querySelector(`#fm-${f.id}`));
+    if (f.type !== 'number') return;
+    const el = modal.querySelector(`#fm-${f.id}`);
+    formatNumberInput(el);
+    if (el.value) el.value = parseMoney(el.value).toLocaleString('id-ID');
   });
 
   const firstInput = modal.querySelector('input, select');
@@ -348,6 +356,7 @@ function showFormModal({ title, icon = 'fa-solid fa-pen-to-square', fields, subm
 
     const values = {};
     for (const f of fields) {
+      if (f.type === 'info') continue;
       const el = modal.querySelector(`#fm-${f.id}`);
       const raw = (el.value || '').trim();
       if (f.type === 'number') {
@@ -413,6 +422,11 @@ function closeSidebar() {
   const overlay = document.getElementById('sidebar-overlay');
   if (sidebar) sidebar.classList.remove('open');
   if (overlay) overlay.classList.remove('active');
+}
+
+function confirmLogout() {
+  closeSidebar();
+  showConfirm('Keluar Akun', 'Yakin ingin keluar dari Nexora?', handleLogout, true);
 }
 
 function toggleSidebar() {
@@ -509,6 +523,14 @@ function bindUi() {
   on('tx-check-all', 'change', (e) => {
     document.querySelectorAll('.tx-checkbox').forEach((cb) => { cb.checked = e.target.checked; });
   });
+
+  const debtListEl = document.getElementById('debt-list');
+  if (debtListEl) {
+    debtListEl.addEventListener('click', (e) => {
+      const btn = e.target.closest('[data-pay-customer]');
+      if (btn) openPayDebtModal(btn.dataset.payCustomer);
+    });
+  }
 
   setupTarikSetorForm();
   setupPpobForm();
@@ -653,7 +675,8 @@ function setupTarikSetorForm() {
     form.reset();
     refreshAllViews();
     showNotification('Transaksi berhasil disimpan ke cloud!', 'success');
-    switchPage('transactions');
+    // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
+    if (!isDebt) switchPage('transactions');
   });
 }
 
@@ -737,7 +760,8 @@ function setupPpobForm() {
     form.reset();
     refreshAllViews();
     showNotification('Transaksi PPOB disimpan ke cloud!', 'success');
-    switchPage('transactions');
+    // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
+    if (!isDebt) switchPage('transactions');
   });
 }
 
@@ -941,7 +965,8 @@ function setupVoucherForm() {
     document.getElementById('vouch-qty').value = 1;
     refreshAllViews();
     showNotification('Transaksi kasir berhasil disimpan!', 'success');
-    switchPage('transactions');
+    // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
+    if (!isDebt) switchPage('transactions');
   });
 }
 
@@ -1129,7 +1154,11 @@ function deleteTransaction(txId) {
     'Transaksi akan dihapus dari cloud dan saldo rekening, stok, serta catatan hutang terkait ikut dikembalikan. Lanjutkan?',
     async () => {
       const deltas = [{ accountId: tx.accountId, delta: Number(tx.amount || 0) }];
-      if (tx.payAccountId && tx.payAccountId !== 'Hutang') {
+      const relatedPayments = appData.debtPayments.filter((p) => String(p.transactionId) === String(tx.id));
+      if (relatedPayments.length > 0) {
+        // Uang yang sudah masuk lewat pembayaran hutang ditarik kembali dari rekening masing-masing
+        relatedPayments.forEach((p) => deltas.push({ accountId: p.accountId, delta: -Number(p.amount || 0) }));
+      } else if (tx.payAccountId && tx.payAccountId !== 'Hutang') {
         deltas.push({ accountId: tx.payAccountId, delta: -Number(tx.admin_fee || 0) });
       }
       const { ops: balanceOps, applies } = buildAccountOps(deltas);
@@ -1138,6 +1167,7 @@ function deleteTransaction(txId) {
       const relatedDebts = appData.debts.filter((d) =>
         (tx.debtId && String(d.id) === String(tx.debtId)) || String(d.transactionId) === String(tx.id)
       );
+      relatedPayments.forEach((p) => ops.push(['debt_payments', null, 'delete', p.id]));
       relatedDebts.forEach((d) => ops.push(['debts', null, 'delete', d.id]));
       ops.push(['transactions', null, 'delete', tx.id]);
 
@@ -1157,6 +1187,7 @@ function deleteTransaction(txId) {
 
       appData.transactions = appData.transactions.filter((t) => String(t.id) !== String(txId));
       appData.debts = appData.debts.filter((d) => !relatedDebts.includes(d));
+      appData.debtPayments = appData.debtPayments.filter((p) => !relatedPayments.includes(p));
       if (restoredVoucher) restoredVoucher.stock = restoredStock;
       applies.forEach((fn) => fn());
 
@@ -1195,7 +1226,7 @@ function printReceipts(ids) {
       <div class="line"><span>${tx.status === 'Hutang' ? 'HUTANG' : 'LUNAS'}</span><strong>${formatRupiah(tx.admin_fee)}</strong></div>
     </div>`).join('');
 
-  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Struk SakaPay</title>
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Struk Nexora</title>
     <style>
       body { font-family: 'Courier New', monospace; font-size: 12px; width: 280px; margin: 0 auto; padding: 10px; color: #000; }
       h2 { text-align: center; margin: 0 0 2px; font-size: 16px; }
@@ -1206,7 +1237,7 @@ function printReceipts(ids) {
       .total { border-top: 2px solid #000; padding-top: 6px; display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; }
       .foot { text-align: center; margin-top: 10px; font-size: 10px; }
     </style></head><body>
-      <h2>SakaPay</h2><div class="sub">Business Center</div>
+      <h2>Nexora</h2><div class="sub">Business Center</div>
       ${rows}
       <div class="total"><span>TOTAL</span><span>${formatRupiah(total)}</span></div>
       <div class="foot">Terima kasih</div>
@@ -1271,59 +1302,125 @@ function exportTransactionsExcel(mode) {
   ws['!cols'] = [{ wch: 26 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 40 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, mode === 'daily' ? 'Harian' : 'Bulanan');
-  const fileName = mode === 'daily' ? `SakaPay_Harian_${todayKey}.xlsx` : `SakaPay_Bulanan_${monthKey}.xlsx`;
+  const fileName = mode === 'daily' ? `Nexora_Harian_${todayKey}.xlsx` : `Nexora_Bulanan_${monthKey}.xlsx`;
   XLSX.writeFile(wb, fileName);
   showNotification('File Excel berhasil dibuat!', 'success');
 }
 
 // ==========================================
-// CATATAN HUTANG
+// CATATAN HUTANG (bisa dicicil per pelanggan)
 // ==========================================
+
+function paidForDebt(debt) {
+  return appData.debtPayments
+    .filter((p) => String(p.debtId) === String(debt.id))
+    .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+}
+
+// Kelompokkan hutang per pelanggan (nama tidak peka huruf besar/kecil), hutang terlama di atas
+function groupDebtsByCustomer() {
+  const map = new Map();
+  [...appData.debts]
+    .sort((a, b) => new Date(a.date) - new Date(b.date))
+    .forEach((d) => {
+      const name = String(d.customer || '').trim() || '(tanpa nama)';
+      const key = name.toLowerCase();
+      if (!map.has(key)) map.set(key, { key, name, debts: [], total: 0 });
+      const g = map.get(key);
+      g.debts.push(d);
+      g.total += Number(d.amount || 0);
+    });
+  return Array.from(map.values()).sort((a, b) => b.total - a.total);
+}
 
 function loadDebtsPage() {
   const listEl = document.getElementById('debt-list');
   if (!listEl) return;
 
-  if (!appData.debts || appData.debts.length === 0) {
-    listEl.innerHTML = '<p class="empty-state">Belum ada catatan hutang.</p>';
-    return;
+  const groups = groupDebtsByCustomer();
+  let html = '';
+
+  if (groups.length === 0) {
+    html += '<p class="empty-state">Belum ada catatan hutang.</p>';
+  } else {
+    const grandTotal = groups.reduce((sum, g) => sum + g.total, 0);
+    html += `<div class="debt-total">Total piutang: <strong>${formatRupiah(grandTotal)}</strong> dari ${groups.length} pelanggan</div>`;
+
+    html += groups.map((g) => `
+      <div class="debt-group">
+        <div class="row-item debt-group-head">
+          <div>
+            <strong style="font-size:14px; display:block; color:#f87171;">${escapeHtml(g.name)}</strong>
+            <span style="font-size:11px; color:var(--text-muted);">${g.debts.length} catatan hutang</span>
+          </div>
+          <div style="text-align:right; display:flex; align-items:center; gap:10px;">
+            <span class="debt-sisa">${formatRupiah(g.total)}</span>
+            <button type="button" class="btn-mini btn-mini-green" data-pay-customer="${escapeHtml(g.key)}">Bayar</button>
+          </div>
+        </div>
+        ${g.debts.map((d) => {
+          const paid = paidForDebt(d);
+          const owed = Number(d.amount || 0);
+          return `
+            <div class="debt-line">
+              <div>
+                <span>${escapeHtml(d.description)}</span>
+                <small>${escapeHtml(new Date(d.date).toLocaleString('id-ID'))}</small>
+              </div>
+              <div style="text-align:right; white-space:nowrap;">
+                <strong>${formatRupiah(owed)}</strong>
+                ${paid > 0 ? `<small>dari ${formatRupiah(owed + paid)}, dibayar ${formatRupiah(paid)}</small>` : ''}
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    `).join('');
   }
 
-  const total = appData.debts.reduce((sum, d) => sum + Number(d.amount || 0), 0);
-  listEl.innerHTML = `
-    <div class="debt-total">Total piutang: <strong>${formatRupiah(total)}</strong></div>
-  ` + appData.debts.map((d) => `
-    <div class="row-item">
-      <div>
-        <strong style="font-size:14px; display:block; color:#f87171;">${escapeHtml(d.customer || '(tanpa nama)')}</strong>
-        <span style="font-size:12px; display:block;">${escapeHtml(d.description)}</span>
-        <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(new Date(d.date).toLocaleString('id-ID'))}</span>
-      </div>
-      <div style="text-align:right; display:flex; align-items:center; gap:10px;">
-        <span style="font-size:14px; font-weight:600; color:#f87171;">${formatRupiah(d.amount)}</span>
-        <button type="button" class="btn-mini btn-mini-green" onclick="payDebt('${escapeHtml(d.id)}')">Lunas</button>
-      </div>
-    </div>
-  `).join('');
+  // Riwayat pembayaran terakhir
+  const history = [...appData.debtPayments].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
+  if (history.length > 0) {
+    html += '<h5 class="debt-history-title">Riwayat Pembayaran Hutang</h5>';
+    html += history.map((p) => {
+      const acc = findAccount(p.accountId);
+      return `
+        <div class="row-item" style="padding:8px 0;">
+          <div>
+            <strong style="font-size:13px; display:block;">${escapeHtml(p.customer || '(tanpa nama)')}</strong>
+            <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(new Date(p.date).toLocaleString('id-ID'))} - ke ${escapeHtml(acc ? acc.name : '-')}</span>
+          </div>
+          <span style="font-size:13px; font-weight:600; color:#34d399;">+${formatRupiah(p.amount)}</span>
+        </div>`;
+    }).join('');
+  }
+
+  listEl.innerHTML = html;
 }
 
-// Pelunasan: uang masuk ke rekening yang dipilih, status transaksi jadi Success, catatan hutang dihapus
-function payDebt(debtId) {
-  const debt = appData.debts.find((d) => String(d.id) === String(debtId));
-  if (!debt) return;
+// Bayar hutang (boleh sebagian). Nominal dialokasikan ke hutang TERLAMA dulu.
+// Contoh: Joko hutang 50.000, bayar 30.000 -> sisa 20.000.
+function openPayDebtModal(customerKey) {
+  const group = groupDebtsByCustomer().find((g) => g.key === customerKey);
+  if (!group) return;
   if (appData.accounts.length === 0) {
     showNotification('Belum ada rekening untuk menerima pembayaran.', 'error');
     return;
   }
 
   showFormModal({
-    title: 'Pelunasan Hutang',
+    title: `Bayar Hutang - ${group.name}`,
     icon: 'fa-solid fa-hand-holding-dollar',
-    submitText: 'Tandai Lunas',
+    submitText: 'Simpan Pembayaran',
     fields: [
       {
+        id: 'info',
+        type: 'info',
+        text: `Total hutang ${group.name}: ${formatRupiah(group.total)}. Isi nominal yang dibayar sekarang; kalau kurang dari total, sisanya tetap tercatat sebagai hutang.`
+      },
+      { id: 'amount', label: 'Nominal Dibayar (Rp)', type: 'number', required: true, value: String(group.total) },
+      {
         id: 'account',
-        label: `${debt.customer || 'Pelanggan'} membayar ${formatRupiah(debt.amount)} ke rekening:`,
+        label: 'Uang masuk ke rekening',
         type: 'select',
         required: true,
         options: [{ value: '', label: '-- Pilih Rekening Penerima --' }].concat(
@@ -1335,23 +1432,74 @@ function payDebt(debtId) {
       const acc = findAccount(v.account);
       if (!acc) return false;
 
-      const { ops: balanceOps, applies } = buildAccountOps([{ accountId: acc.id, delta: Number(debt.amount || 0) }]);
-      const tx = appData.transactions.find((t) => String(t.id) === String(debt.transactionId));
+      if (v.amount > group.total) {
+        showNotification(`Nominal melebihi total hutang (${formatRupiah(group.total)}).`, 'error');
+        return false;
+      }
 
+      const nowIso = new Date().toISOString();
       const ops = [];
-      if (tx) ops.push(['transactions', { status: 'Success', payAccountId: String(acc.id) }, 'update', tx.id]);
-      ops.push(['debts', null, 'delete', debt.id]);
+      const newPayments = [];
+      const removedDebtIds = [];
+      const reducedDebts = []; // { debt, newAmount }
+      const settledTxs = [];
+      let left = v.amount;
+
+      for (const d of group.debts) {
+        if (left <= 0) break;
+        const owed = Number(d.amount || 0);
+        const part = Math.min(owed, left);
+        if (part <= 0) continue;
+        left -= part;
+
+        const payment = {
+          id: genId('pay'),
+          user_id: currentUserId,
+          debtId: String(d.id),
+          transactionId: d.transactionId ? String(d.transactionId) : null,
+          customer: d.customer || group.name,
+          amount: part,
+          accountId: String(acc.id),
+          date: nowIso
+        };
+        newPayments.push(payment);
+        ops.push(['debt_payments', payment, 'insert']);
+
+        const remainingOwed = owed - part;
+        if (remainingOwed > 0) {
+          ops.push(['debts', { amount: remainingOwed }, 'update', d.id]);
+          reducedDebts.push({ debt: d, newAmount: remainingOwed });
+        } else {
+          ops.push(['debts', null, 'delete', d.id]);
+          removedDebtIds.push(String(d.id));
+          const tx = appData.transactions.find((t) => String(t.id) === String(d.transactionId));
+          if (tx) {
+            ops.push(['transactions', { status: 'Success' }, 'update', tx.id]);
+            settledTxs.push(tx);
+          }
+        }
+      }
+
+      const { ops: balanceOps, applies } = buildAccountOps([{ accountId: acc.id, delta: v.amount }]);
       ops.push(...balanceOps);
 
       const ok = await runOps(ops);
       if (!ok) return false;
 
-      if (tx) { tx.status = 'Success'; tx.payAccountId = String(acc.id); }
-      appData.debts = appData.debts.filter((d) => String(d.id) !== String(debtId));
+      appData.debtPayments.push(...newPayments);
+      reducedDebts.forEach((r) => { r.debt.amount = r.newAmount; });
+      appData.debts = appData.debts.filter((d) => !removedDebtIds.includes(String(d.id)));
+      settledTxs.forEach((tx) => { tx.status = 'Success'; });
       applies.forEach((fn) => fn());
 
       refreshAllViews();
-      showNotification('Hutang lunas dan saldo rekening bertambah!', 'success');
+      const sisa = group.total - v.amount;
+      showNotification(
+        sisa > 0
+          ? `${group.name} membayar ${formatRupiah(v.amount)}. Sisa hutang ${formatRupiah(sisa)}.`
+          : `${group.name} melunasi hutang ${formatRupiah(v.amount)}.`,
+        'success'
+      );
     }
   });
 }

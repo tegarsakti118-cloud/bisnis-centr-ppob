@@ -1,5 +1,5 @@
 // ==========================================
-// SAKAPAY v2.1 - HELPER UMUM
+// NEXORA v2.1 - HELPER UMUM
 // (Versi cloud: data TIDAK lagi disimpan di localStorage.
 //  getAppData / saveAppData lama dihapus karena bentrok dengan app.js)
 // ==========================================
