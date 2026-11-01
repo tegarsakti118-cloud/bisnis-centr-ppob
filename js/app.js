@@ -15,7 +15,12 @@ let appData = {
   debts: [],
   expenses: [],
   customers: [],
-  debtPayments: []
+  debtPayments: [],
+  // Fitur baru (diisi oleh js/features.js)
+  balanceTransfers: [],
+  commissions: [],
+  cashCalculations: [],
+  cashCalculationItems: []
 };
 
 let currentUserId = null;
@@ -127,6 +132,12 @@ async function fetchCloudData() {
     showNotification('Sesi login berakhir. Silakan masuk kembali.', 'error');
     setTimeout(handleLogout, 1500);
     return false;
+  }
+
+  // Tabel fitur baru (Pindah Saldo, Komisi & Fee, Kalkulator Uang) dimuat terpisah
+  // supaya kegagalannya tidak mengganggu fitur lama.
+  if (typeof fetchFeatureTables === 'function') {
+    try { await fetchFeatureTables(); } catch (err) { console.error('Gagal memuat tabel fitur baru:', err); }
   }
 
   const byDate = (a, b) => new Date(a.date) - new Date(b.date);
@@ -313,6 +324,8 @@ function showFormModal({ title, icon = 'fa-solid fa-pen-to-square', fields, subm
         `<option value="${escapeHtml(o.value)}" ${String(o.value) === String(f.value) ? 'selected' : ''}>${escapeHtml(o.label)}</option>`
       ).join('');
       control = `<select id="${id}" class="glass-input">${opts}</select>`;
+    } else if (f.type === 'datetime') {
+      control = `<input type="datetime-local" id="${id}" class="glass-input" value="${escapeHtml(f.value === undefined ? '' : f.value)}">`;
     } else {
       const inputMode = f.type === 'number' ? 'numeric' : (f.type === 'tel' ? 'tel' : 'text');
       control = `<input type="text" inputmode="${inputMode}" id="${id}" class="glass-input" autocomplete="off"
@@ -673,6 +686,7 @@ function setupTarikSetorForm() {
     if (!ok) return;
 
     form.reset();
+    setDefaultDateTime(document.getElementById('ts-date')); // reset() mengosongkan tanggal
     refreshAllViews();
     showNotification('Transaksi berhasil disimpan ke cloud!', 'success');
     // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
@@ -687,6 +701,7 @@ function setupTarikSetorForm() {
 function initPpobPage() {
   setSelectOptions(document.getElementById('ppob-account'), accountOptions('-- Pilih Aplikasi --'));
   setSelectOptions(document.getElementById('ppob-pay-method'), accountOptions('-- Pilih Rekening Penerima --', true));
+  setDefaultDateTime(document.getElementById('ppob-date'));
   formatNumberInput(document.getElementById('ppob-modal'));
   formatNumberInput(document.getElementById('ppob-jual'));
 }
@@ -696,6 +711,7 @@ function setupPpobForm() {
   if (!form) return;
 
   guardSubmit(form, async () => {
+    const dateVal = document.getElementById('ppob-date').value;
     const accountId = document.getElementById('ppob-account').value;
     const service = document.getElementById('ppob-service').value;
     const target = document.getElementById('ppob-target').value.trim();
@@ -725,7 +741,8 @@ function setupPpobForm() {
     }
 
     const txId = genId('tx');
-    const txDate = new Date().toISOString();
+    const parsedDate = dateVal ? new Date(dateVal) : new Date();
+    const txDate = (isNaN(parsedDate.getTime()) ? new Date() : parsedDate).toISOString();
     const isDebt = payMethod === 'Hutang';
     const debtId = isDebt ? genId('debt') : null;
     const notes = `PPOB: ${service} (${target})`;
@@ -758,6 +775,7 @@ function setupPpobForm() {
     if (!ok) return;
 
     form.reset();
+    setDefaultDateTime(document.getElementById('ppob-date')); // reset() mengosongkan tanggal
     refreshAllViews();
     showNotification('Transaksi PPOB disimpan ke cloud!', 'success');
     // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
@@ -994,9 +1012,16 @@ function loadDashboardData() {
 
   setText('val-total-modal', formatRupiah(totalSaldo));
   setText('val-omzet-today', formatRupiah(sumBy(todayTx, 'admin_fee')));
-  setText('val-profit-today', formatRupiah(sumBy(todayTx, 'profit')));
+  // Komisi & fee = pendapatan; biaya admin Pindah Saldo = biaya. Pindah saldo sendiri BUKAN pendapatan.
+  const fxDay = (typeof featureTotals === 'function') ? featureTotals('day') : { commission: 0, transferFee: 0 };
+  const fxMonth = (typeof featureTotals === 'function') ? featureTotals('month') : { commission: 0, transferFee: 0 };
+
+  setText('val-profit-today', formatRupiah(sumBy(todayTx, 'profit') + fxDay.commission - fxDay.transferFee));
   setText('val-omzet-month', formatRupiah(sumBy(monthTx, 'admin_fee')));
-  setText('val-profit-month', formatRupiah(sumBy(monthTx, 'profit')));
+  setText('val-profit-month', formatRupiah(sumBy(monthTx, 'profit') + fxMonth.commission - fxMonth.transferFee));
+  setText('val-commission-today', formatRupiah(fxDay.commission));
+  setText('val-commission-month', formatRupiah(fxMonth.commission));
+  setText('val-transfer-fee-month', formatRupiah(fxMonth.transferFee));
   setText('val-total-tx', String(db.transactions.length));
 
   renderRecentTransactions(db.transactions);

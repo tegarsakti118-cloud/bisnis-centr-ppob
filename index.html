@@ -59,6 +59,15 @@
           <a href="#balances" class="nav-link" data-page="balances">
             <i class="fa-solid fa-vault"></i> <span>Balance Mgmt</span>
           </a>
+          <a href="#transfer" class="nav-link" data-page="transfer">
+            <i class="fa-solid fa-right-left"></i> <span>Pindah Saldo</span>
+          </a>
+          <a href="#commission" class="nav-link" data-page="commission">
+            <i class="fa-solid fa-hand-holding-dollar"></i> <span>Komisi & Fee</span>
+          </a>
+          <a href="#cashcalc" class="nav-link" data-page="cashcalc">
+            <i class="fa-solid fa-calculator"></i> <span>Kalkulator Uang</span>
+          </a>
           <a href="#customers" class="nav-link" data-page="customers">
             <i class="fa-solid fa-users"></i> <span>Customers</span>
           </a>
@@ -115,7 +124,7 @@
                 <i class="fa-solid fa-sack-dollar icon-green"></i>
               </div>
               <h3 class="metric-value" id="val-profit-today">Rp 0</h3>
-              <span class="metric-sub text-muted">Bersih Admin Fee</span>
+              <span class="metric-sub text-muted">Transaksi + komisi - biaya transfer</span>
             </div>
 
             <div class="metric-card glass-card">
@@ -142,7 +151,34 @@
                 <i class="fa-solid fa-wallet icon-green"></i>
               </div>
               <h3 class="metric-value" id="val-profit-month">Rp 0</h3>
-              <span class="metric-sub text-positive">Bersih Bulan Berjalan</span>
+              <span class="metric-sub text-positive">Transaksi + komisi - biaya transfer</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Komisi & Fee Hari Ini</span>
+                <i class="fa-solid fa-hand-holding-dollar icon-green"></i>
+              </div>
+              <h3 class="metric-value" id="val-commission-today">Rp 0</h3>
+              <span class="metric-sub text-muted">Pendapatan tambahan</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Komisi & Fee Bulan Ini</span>
+                <i class="fa-solid fa-coins icon-green"></i>
+              </div>
+              <h3 class="metric-value" id="val-commission-month">Rp 0</h3>
+              <span class="metric-sub text-muted">Akumulasi bulan berjalan</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Biaya Pindah Saldo (Bulan)</span>
+                <i class="fa-solid fa-right-left icon-orange"></i>
+              </div>
+              <h3 class="metric-value" id="val-transfer-fee-month">Rp 0</h3>
+              <span class="metric-sub text-muted">Biaya admin, bukan omzet</span>
             </div>
           </div>
 
@@ -245,6 +281,11 @@
 
           <div class="glass-card" style="padding: 24px;">
             <form id="ppob-form" style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-calendar"></i> Tanggal Transaksi</label>
+                <input type="datetime-local" id="ppob-date" class="glass-input" required>
+              </div>
+
               <div class="form-group" style="margin-bottom: 0;">
                 <label><i class="fa-solid fa-layer-group"></i> Pilih Aplikasi / Sumber Saldo</label>
                 <select id="ppob-account" class="glass-input" required>
@@ -433,9 +474,14 @@
         <section id="page-balances" class="page-view">
           <div class="card-title flex-between" style="margin-bottom: 16px;">
             <h4><i class="fa-solid fa-vault"></i> Daftar Akun & Saldo</h4>
-            <button class="btn-primary" id="btn-add-account" style="font-size: 12px; padding: 6px 12px;">
-              <i class="fa-solid fa-plus"></i> Tambah Akun
-            </button>
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn-primary" data-page="transfer" style="font-size: 12px; padding: 6px 12px; background: var(--glass-bg); border: 1px solid var(--glass-border);">
+                <i class="fa-solid fa-right-left"></i> Pindah Saldo
+              </button>
+              <button class="btn-primary" id="btn-add-account" style="font-size: 12px; padding: 6px 12px;">
+                <i class="fa-solid fa-plus"></i> Tambah Akun
+              </button>
+            </div>
           </div>
 
           <div class="metrics-grid" id="accounts-grid" style="margin-bottom: 24px;"></div>
@@ -490,6 +536,24 @@
             </div>
           </div>
 
+          <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
+            <div class="card-title flex-between">
+              <h4><i class="fa-solid fa-scale-balanced"></i> Laporan Keuangan Bulan Ini</h4>
+              <button type="button" class="btn-primary" id="btn-export-report" style="background:#107c41; font-size: 11px; padding: 6px 10px;">
+                <i class="fa-solid fa-download"></i> Excel
+              </button>
+            </div>
+            <div class="report-rows">
+              <div class="row-item"><span>Omzet transaksi</span><strong id="rpt-omzet">Rp 0</strong></div>
+              <div class="row-item"><span>Keuntungan transaksi</span><strong id="rpt-profit-tx">Rp 0</strong></div>
+              <div class="row-item"><span>Komisi & Fee (pendapatan)</span><strong id="rpt-commission" style="color:#34d399;">Rp 0</strong></div>
+              <div class="row-item"><span>Biaya admin Pindah Saldo</span><strong id="rpt-transfer-fee" style="color:#f87171;">Rp 0</strong></div>
+              <div class="row-item"><span>Pengeluaran operasional</span><strong id="rpt-operational" style="color:#f87171;">Rp 0</strong></div>
+              <div class="row-item" style="border-bottom:none;"><span><b>Estimasi laba bersih</b></span><strong id="rpt-net" style="font-size:15px;">Rp 0</strong></div>
+            </div>
+            <p class="report-note">Bukan pendapatan / biaya: saldo yang dipindahkan <b id="rpt-transfer-amount">Rp 0</b> dan prive <b id="rpt-prive">Rp 0</b>.</p>
+          </div>
+
           <div class="glass-card" style="padding: 20px;">
             <div class="card-title">
               <h4><i class="fa-solid fa-list"></i> Riwayat Pengeluaran & Keuangan</h4>
@@ -512,6 +576,200 @@
           <div class="glass-card" style="padding: 20px;">
             <div class="tx-list" id="customer-list">
               <p class="empty-state">Belum ada data pelanggan.</p>
+            </div>
+          </div>
+        </section>
+
+
+        <!-- PAGE: PINDAH SALDO -->
+        <section id="page-transfer" class="page-view">
+          <div class="card-title" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-right-left"></i> Pindah Saldo Antar Rekening</h4>
+          </div>
+
+          <div id="transfer-warning" class="fm-info feature-warning" style="display:none;">
+            Tabel fitur ini belum ada di database. Jalankan <b>sql/nexora_fitur_baru.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.
+          </div>
+
+          <div class="metrics-grid" style="margin-bottom: 16px;">
+            <div class="metric-card glass-card">
+              <div class="metric-header"><span>Dipindahkan Bulan Ini</span><i class="fa-solid fa-right-left icon-blue"></i></div>
+              <h3 class="metric-value" id="tf-sum-month">Rp 0</h3>
+              <span class="metric-sub text-muted">Bukan omzet / keuntungan</span>
+            </div>
+            <div class="metric-card glass-card">
+              <div class="metric-header"><span>Biaya Admin Bulan Ini</span><i class="fa-solid fa-receipt icon-orange"></i></div>
+              <h3 class="metric-value" id="tf-sum-fee">Rp 0</h3>
+              <span class="metric-sub text-muted">Hari ini: <span id="tf-sum-fee-today">Rp 0</span></span>
+            </div>
+          </div>
+
+          <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
+            <form id="transfer-form" style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-calendar"></i> Tanggal Transaksi</label>
+                <input type="datetime-local" id="tf-date" class="glass-input" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-arrow-up"></i> Rekening / Aplikasi Asal</label>
+                <select id="tf-from" class="glass-input" required></select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-arrow-down"></i> Rekening / Aplikasi Tujuan</label>
+                <select id="tf-to" class="glass-input" required></select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-money-bill-wave"></i> Nominal Saldo (Rp)</label>
+                <input type="text" inputmode="numeric" id="tf-amount" class="glass-input" placeholder="Contoh: 500.000" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-receipt"></i> Biaya Admin (Rp, dibebankan ke pengirim)</label>
+                <input type="text" inputmode="numeric" id="tf-fee" class="glass-input" placeholder="0">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-note-sticky"></i> Catatan (Opsional)</label>
+                <input type="text" id="tf-notes" class="glass-input" placeholder="Contoh: Top up DANA">
+              </div>
+              <div id="tf-preview" class="fm-info" style="display:none; margin-bottom:0;"></div>
+              <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px;">
+                <i class="fa-solid fa-circle-check"></i> Pindahkan Saldo
+              </button>
+            </form>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div class="card-title"><h4><i class="fa-solid fa-clock-rotate-left"></i> Riwayat Pemindahan Saldo</h4></div>
+            <div class="tx-list" id="transfer-list" style="margin-top: 12px;">
+              <p class="empty-state">Belum ada riwayat pemindahan saldo.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE: KOMISI & FEE -->
+        <section id="page-commission" class="page-view">
+          <div class="card-title" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-hand-holding-dollar"></i> Komisi & Fee</h4>
+          </div>
+
+          <div id="commission-warning" class="fm-info feature-warning" style="display:none;">
+            Tabel fitur ini belum ada di database. Jalankan <b>sql/nexora_fitur_baru.sql</b> di Supabase SQL Editor, lalu muat ulang halaman.
+          </div>
+
+          <div class="metrics-grid" style="margin-bottom: 16px;">
+            <div class="metric-card glass-card">
+              <div class="metric-header"><span>Fee Hari Ini</span><i class="fa-solid fa-sun icon-orange"></i></div>
+              <h3 class="metric-value" id="cm-sum-today">Rp 0</h3>
+              <span class="metric-sub text-muted">Pendapatan tambahan</span>
+            </div>
+            <div class="metric-card glass-card">
+              <div class="metric-header"><span>Fee Bulan Ini</span><i class="fa-solid fa-calendar-days icon-green"></i></div>
+              <h3 class="metric-value" id="cm-sum-month">Rp 0</h3>
+              <span class="metric-sub text-muted"><span id="cm-sum-count">0</span> catatan</span>
+            </div>
+          </div>
+
+          <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
+            <div class="fm-info" style="margin-bottom: 14px;">
+              Catat hanya <b>fee / komisi yang Anda terima</b>, bukan seluruh uang pelanggan. Fee dari transaksi yang sudah diinput di Tarik Setor, PPOB, atau Kasir sudah dihitung otomatis, jadi <b>jangan dicatat lagi di sini</b>.
+            </div>
+            <form id="commission-form" style="display: flex; flex-direction: column; gap: 14px;">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-tags"></i> Kategori Pendapatan</label>
+                <select id="cm-category" class="glass-input" required>
+                  <option value="fee_setor">Fee Setor Tunai</option>
+                  <option value="fee_tarik">Fee Tarik Tunai</option>
+                  <option value="fee_transfer">Fee Transfer</option>
+                  <option value="bunga_seabank">Bunga Tabungan SeaBank</option>
+                  <option value="komisi_lain">Komisi Lainnya</option>
+                </select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-money-bill-wave"></i> Nominal Transaksi (Rp, opsional)</label>
+                <input type="text" inputmode="numeric" id="cm-tx-amount" class="glass-input" placeholder="Hanya sebagai catatan, tidak dihitung">
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-coins"></i> Nominal Fee / Komisi (Rp)</label>
+                <input type="text" inputmode="numeric" id="cm-amount" class="glass-input" placeholder="Fee yang Anda terima" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-vault"></i> Sumber Pendapatan (Diterima di)</label>
+                <select id="cm-account" class="glass-input"></select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-calendar"></i> Tanggal</label>
+                <input type="datetime-local" id="cm-date" class="glass-input" required>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label><i class="fa-solid fa-note-sticky"></i> Catatan (Opsional)</label>
+                <input type="text" id="cm-notes" class="glass-input" placeholder="Contoh: Bunga SeaBank Oktober">
+              </div>
+              <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px;">
+                <i class="fa-solid fa-circle-check"></i> Simpan Komisi / Fee
+              </button>
+            </form>
+          </div>
+
+          <div class="dashboard-grid" style="margin-top: 0; margin-bottom: 20px;">
+            <div class="glass-card chart-container">
+              <div class="card-title"><h4><i class="fa-solid fa-chart-column"></i> Pendapatan Fee 7 Hari Terakhir</h4></div>
+              <div class="canvas-wrapper"><canvas id="commissionChart"></canvas></div>
+            </div>
+            <div class="glass-card recent-tx-container">
+              <div class="card-title"><h4><i class="fa-solid fa-chart-pie"></i> Per Kategori (Bulan Ini)</h4></div>
+              <div id="cm-breakdown" style="margin-top: 8px;"></div>
+            </div>
+          </div>
+
+          <div class="glass-card" style="padding: 20px;">
+            <div class="card-title"><h4><i class="fa-solid fa-clock-rotate-left"></i> Riwayat Komisi & Fee</h4></div>
+            <div class="tx-list" id="commission-list" style="margin-top: 12px;">
+              <p class="empty-state">Belum ada catatan komisi / fee.</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- PAGE: KALKULATOR UANG -->
+        <section id="page-cashcalc" class="page-view">
+          <div class="card-title" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-calculator"></i> Kalkulator Uang</h4>
+          </div>
+
+          <div id="cash-warning" class="fm-info feature-warning" style="display:none;">
+            Tabel fitur ini belum ada di database. Jalankan <b>sql/nexora_fitur_baru.sql</b> di Supabase SQL Editor, lalu muat ulang halaman. Kalkulator tetap bisa dipakai, tetapi riwayat belum bisa disimpan.
+          </div>
+
+          <div class="cash-grid" id="cash-grid"></div>
+
+          <div class="glass-card cash-summary">
+            <div class="cash-summary-row">
+              <div>
+                <span class="cash-summary-label">Total Uang</span>
+                <h3 id="cash-total" class="cash-total">Rp 0</h3>
+              </div>
+              <div style="text-align:right;">
+                <span class="cash-summary-label">Total Lembar</span>
+                <h3 id="cash-pieces" class="cash-pieces">0 lembar</h3>
+              </div>
+            </div>
+            <input type="text" id="cash-notes" class="glass-input" placeholder="Catatan perhitungan (opsional)" style="margin-top: 12px;">
+            <div class="cash-actions">
+              <button type="button" class="btn-primary" id="btn-cash-reset" style="background: var(--glass-bg); border: 1px solid var(--glass-border);">
+                <i class="fa-solid fa-rotate-left"></i> Reset
+              </button>
+              <button type="button" class="btn-primary" id="btn-cash-save" style="background:#3b82f6;">
+                <i class="fa-solid fa-floppy-disk"></i> Simpan Riwayat
+              </button>
+            </div>
+            <button type="button" class="btn-primary" id="btn-cash-apply" style="width:100%; justify-content:center; margin-top:10px;">
+              <i class="fa-solid fa-vault"></i> Catat Sebagai Saldo Kas
+            </button>
+            <p class="report-note" style="margin-top:10px;">Kalkulator hanya menghitung uang. Saldo kas baru berubah setelah Anda menekan "Catat Sebagai Saldo Kas" dan mengonfirmasi.</p>
+          </div>
+
+          <div class="glass-card" style="padding: 20px; margin-top: 20px;">
+            <div class="card-title"><h4><i class="fa-solid fa-clock-rotate-left"></i> Riwayat Perhitungan</h4></div>
+            <div class="tx-list" id="cash-history" style="margin-top: 12px;">
+              <p class="empty-state">Belum ada riwayat perhitungan.</p>
             </div>
           </div>
         </section>
@@ -548,5 +806,6 @@
   
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
+  <script src="js/features.js"></script>
 </body>
 </html>

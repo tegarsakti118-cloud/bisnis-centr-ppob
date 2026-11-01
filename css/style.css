@@ -752,3 +752,174 @@ img, canvas, svg {
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* ==========================================================
+   FITUR BARU v2.2: Pindah Saldo, Komisi & Fee, Kalkulator Uang
+   ========================================================== */
+.row-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.feature-warning {
+  margin-bottom: 14px;
+  border-color: rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.1);
+  color: #fecaca;
+}
+
+.report-rows .row-item span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.report-rows .row-item strong {
+  font-size: 13px;
+}
+
+.report-note {
+  margin-top: 10px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.badge-ok,
+.badge-plain {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.badge-ok {
+  color: #34d399;
+  background: rgba(52, 211, 153, 0.12);
+  border: 1px solid rgba(52, 211, 153, 0.4);
+}
+
+.badge-plain {
+  color: var(--text-muted);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+}
+
+/* ---------- Kalkulator uang: kartu dua kolom, tema mengikuti aplikasi ---------- */
+.cash-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+@media (min-width: 768px) {
+  .cash-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+.cash-card {
+  min-width: 0;
+  min-height: 140px;
+  padding: 18px 14px 16px;
+  border-radius: var(--radius-lg);
+  background: var(--glass-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--glass-border);
+  color: var(--text-main);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.cash-card:focus-within,
+.cash-card.cash-filled {
+  border-color: rgba(23, 168, 151, 0.7);
+  background: rgba(23, 168, 151, 0.1);
+}
+
+.cash-card-head {
+  font-size: 17px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--primary-color);
+}
+
+.cash-card .cash-qty {
+  width: 80%;
+  padding: 11px 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-md);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 600;
+  text-align: center;
+  outline: none;
+}
+
+.cash-card .cash-qty::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+.cash-card .cash-qty:focus {
+  border-color: var(--primary-color);
+}
+
+.cash-sub {
+  align-self: flex-start;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--text-main);
+  word-break: break-word;
+}
+
+.cash-sub:empty {
+  display: none;
+}
+
+.cash-summary {
+  padding: 18px;
+}
+
+.cash-summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.cash-summary-label {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.cash-total {
+  font-size: 22px;
+  font-weight: 800;
+  color: #34d399;
+}
+
+.cash-pieces {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cash-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.cash-actions .btn-primary {
+  justify-content: center;
+}
