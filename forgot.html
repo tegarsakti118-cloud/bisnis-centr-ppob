@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lupa Password - SakaPay v2.1</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+
+  <style>
+    * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; }
+    body { background: #0d1117; display: flex; justify-content: center; align-items: center; min-height: 100vh; color: #e6edf3; }
+    .login-card { background: #161b22; border: 1px solid #30363d; padding: 32px 28px; border-radius: 16px; width: 100%; max-width: 380px; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4); }
+    .brand-header { text-align: center; margin-bottom: 24px; }
+    .brand-header h2 { font-size: 20px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
+    .brand-header p { font-size: 12px; color: #8b949e; }
+    .input-group { margin-bottom: 14px; }
+    .input-group label { display: block; font-size: 12px; font-weight: 500; color: #8b949e; margin-bottom: 6px; }
+    .input-wrapper { position: relative; }
+    .input-wrapper i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #8b949e; font-size: 13px; }
+    .input-wrapper input { width: 100%; padding: 10px 12px 10px 36px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #fff; font-size: 13px; outline: none; }
+    .input-wrapper input:focus { border-color: #17A897; }
+    .btn { width: 100%; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; }
+    .btn:disabled { cursor: not-allowed; }
+    .btn-primary { background: #17A897; color: white; }
+    .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 12px; }
+    .card-footer a { color: #58a6ff; text-decoration: none; }
+    .divider { margin: 16px 0; border: none; border-top: 1px solid #30363d; }
+    .version-text { text-align: center; margin-top: 20px; font-size: 11px; color: #484f58; }
+  </style>
+</head>
+<body>
+
+  <div class="login-card">
+    <div class="brand-header">
+      <h2>Lupa Password</h2>
+      <p>Masukkan email akun Anda. Kami kirim link untuk membuat password baru.</p>
+    </div>
+
+    <div class="input-group">
+      <label>Email</label>
+      <div class="input-wrapper">
+        <i class="fa-solid fa-envelope"></i>
+        <input type="email" id="forgot-email" placeholder="nama@email.com" autocomplete="email" />
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="processForgot()">Kirim Link Reset</button>
+
+    <hr class="divider">
+
+    <div class="card-footer" style="justify-content: center;">
+      <a href="login.html">Kembali ke Login</a>
+    </div>
+
+    <div class="version-text">SakaPay Business Center (Cloud)</div>
+  </div>
+
+  <script>
+    const sbAuth = window.supabaseClient;
+    // Halaman tujuan setelah klik link di email (harus didaftarkan di Supabase > Authentication > URL Configuration)
+    const RESET_URL = new URL('reset.html', window.location.href).href;
+
+    function setBusy(isBusy) {
+      document.querySelectorAll('.btn').forEach(b => { b.disabled = isBusy; b.style.opacity = isBusy ? '0.6' : '1'; });
+    }
+
+    document.getElementById('forgot-email').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') processForgot();
+    });
+
+    async function processForgot() {
+      if (!sbAuth) return alert('Library Supabase gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.');
+      const email = document.getElementById('forgot-email').value.trim();
+      if (!email) return alert('Isi email terlebih dahulu!');
+
+      setBusy(true);
+      try {
+        const { error } = await sbAuth.auth.resetPasswordForEmail(email, { redirectTo: RESET_URL });
+        if (error) {
+          alert('Gagal mengirim link: ' + error.message);
+          setBusy(false);
+          return;
+        }
+        // Pesan sama walau email tidak terdaftar (tidak membocorkan siapa yang punya akun)
+        alert('Jika email terdaftar, link reset password sudah dikirim. Cek inbox atau folder spam.');
+      } catch (err) {
+        alert('Gagal mengirim link: ' + (err.message || err));
+      }
+      setBusy(false);
+    }
+  </script>
+</body>
+</html>
