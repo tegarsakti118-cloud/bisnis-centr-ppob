@@ -92,13 +92,20 @@
     }
   }
 
+  // Pakai fetchAllRows (app.js terbaru) bila ada; kalau app.js masih versi lama, jatuh ke select biasa
+  // supaya perbedaan versi tidak membuat tabel fitur dianggap "belum siap".
+  async function fetchRows(table) {
+    if (typeof fetchAllRows === 'function') return fetchAllRows(table);
+    return sb.from(table).select('*');
+  }
+
   // ------------------------------------------
   // Muat data (dipanggil oleh app.js -> fetchCloudData)
   // ------------------------------------------
   async function fetchFeatureTables() {
     const results = await Promise.all(Object.keys(FEATURE_TABLES).map(async (table) => {
       try {
-        const { data, error } = await fetchAllRows(table);
+        const { data, error } = await fetchRows(table);
         return { table, data: data || [], error };
       } catch (err) {
         return { table, data: [], error: err };
@@ -126,7 +133,7 @@
   // Muat ulang akun + semua tabel fitur setelah RPC sukses (saldo diubah di server)
   async function reloadFeatureData() {
     try {
-      const { data, error } = await fetchAllRows('accounts');
+      const { data, error } = await fetchRows('accounts');
       if (!error && data) appData.accounts = data;
     } catch (err) {
       console.error('Gagal memuat ulang akun:', err);

@@ -104,10 +104,26 @@ function isAuthError(err) {
 // FETCH & SAVE DATA CLOUD SUPABASE
 // ==========================================
 
+// Ambil SEMUA baris tabel. Supabase membatasi 1000 baris per permintaan,
+// jadi data dibaca bertahap (per 1000) supaya riwayat panjang tidak terpotong.
+async function fetchAllRows(table) {
+  const size = 1000;
+  let from = 0;
+  let all = [];
+  for (;;) {
+    const { data, error } = await sb.from(table).select('*').order('id', { ascending: true }).range(from, from + size - 1);
+    if (error) return { data: null, error };
+    all = all.concat(data || []);
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  return { data: all, error: null };
+}
+
 async function fetchCloudData() {
   const results = await Promise.all(CLOUD_TABLES.map(async (table) => {
     try {
-      const { data, error } = await sb.from(table).select('*');
+      const { data, error } = await fetchAllRows(table);
       if (error) return { table, error };
       return { table, data: data || [] };
     } catch (err) {
@@ -205,6 +221,31 @@ async function runOps(ops) {
 function findAccount(id) {
   if (id === null || id === undefined || id === 'Hutang') return null;
   return appData.accounts.find((a) => String(a.id) === String(id)) || null;
+}
+
+// Peringatan (bukan blokir) jika saldo sumber tidak cukup untuk modal transaksi.
+// Resolve true = lanjut simpan, false = batal. Aman untuk semua cara menutup dialog.
+function confirmLowBalance(acc, needed) {
+  if (!acc || Number(acc.balance || 0) >= Number(needed || 0)) return Promise.resolve(true);
+  return new Promise((resolve) => {
+    let done = false;
+    let observer = null;
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      if (observer) observer.disconnect();
+      resolve(value);
+    };
+    showConfirm(
+      'Saldo Tidak Cukup',
+      `Saldo ${acc.name} ${formatRupiah(acc.balance)}, sedangkan modal transaksi ${formatRupiah(needed)}. Saldo akan menjadi minus. Tetap simpan?`,
+      () => finish(true),
+      true
+    );
+    const modal = document.getElementById('custom-confirm-modal');
+    observer = new MutationObserver(() => { if (!document.body.contains(modal)) finish(false); });
+    observer.observe(document.body, { childList: true });
+  });
 }
 
 function parseMoney(value) {
@@ -650,6 +691,7 @@ function setupTarikSetorForm() {
       showNotification('Akun sumber / penerima tidak ditemukan!', 'error');
       return;
     }
+    if (!(await confirmLowBalance(source, modal))) return;
 
     const txId = genId('tx');
     const parsedDate = dateVal ? new Date(dateVal) : new Date();
@@ -739,6 +781,7 @@ function setupPpobForm() {
       showNotification('Akun sumber / penerima tidak ditemukan!', 'error');
       return;
     }
+    if (!(await confirmLowBalance(source, modal))) return;
 
     const txId = genId('tx');
     const parsedDate = dateVal ? new Date(dateVal) : new Date();
@@ -941,6 +984,7 @@ function setupVoucherForm() {
     const totalModalFisik = Number(vouch.modal_fisik || 0) * qty;
     const totalJual = Number(vouch.price || 0) * qty;
     const totalProfit = totalJual - (totalModalSaldo + totalModalFisik);
+    if (!(await confirmLowBalance(accInject, totalModalSaldo))) return;
 
     const txId = genId('tx');
     const txDate = new Date().toISOString();
