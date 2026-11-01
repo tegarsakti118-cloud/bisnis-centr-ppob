@@ -106,12 +106,15 @@
     }
 
     async function processGoogleLogin() {
-      const { error } = await window.supabaseClient.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo: window.location.origin + '/index.html' }
-      });
-      if (error) alert('Gagal Google Login: ' + error.message);
+  const { error } = await window.supabaseClient.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin + '/index.html' // Mengikuti domain yang sedang dibuka otomatis
     }
+  });
+  if (error) alert('Gagal Google Login: ' + error.message);
+}
+
   </script>
 </body>
 </html>
