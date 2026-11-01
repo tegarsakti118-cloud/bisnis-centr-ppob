@@ -12,31 +12,14 @@
   <!-- Supabase JS Client CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
-  <!-- Skrip Proteksi & Sesi Cloud -->
-  <script>
-    const SUPABASE_URL = 'https://qdnegvyomibqjuspjidk.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_fOUkYi-g2j6POK-g4Oaqqw__uu5592_';
-    const sbClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  <!-- Client Supabase tunggal (dibuat di js/supabase.js) -->
+  <script src="js/supabase.js"></script>
 
-    // Proteksi Halaman Utama
-    sbClient.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        window.location.href = 'login.html';
-      }
-    });
-
-    // Fungsi Logout Global
-    async function handleLogout() {
-      await sbClient.auth.signOut();
-      window.location.href = 'login.html';
-    }
-  </script>
-
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <link rel="stylesheet" href="css/style.css">
 </head>
-<body>
+<body class="auth-pending">
 
   <div class="glass-blob blob-1"></div>
   <div class="glass-blob blob-2"></div>
@@ -71,7 +54,7 @@
           <i class="fa-solid fa-users"></i> <span>Customers</span>
         </a>
         <a href="#transactions" class="nav-link" data-page="transactions">
-          <i class="fa-solid fa-gear"></i> <span>Pengaturan & Backup</span>
+          <i class="fa-solid fa-file-export"></i> <span>Riwayat & Export</span>
         </a>
       </nav>
 
@@ -79,8 +62,11 @@
         <div class="avatar"><i class="fa-solid fa-user-shield"></i></div>
         <div class="user-info">
           <span class="user-name">Owner SakaPay</span>
-          <span class="user-role">Super Admin (Offline)</span>
+          <span class="user-role">Cloud</span>
         </div>
+        <button type="button" id="btn-logout" class="btn-logout" onclick="handleLogout()" title="Keluar">
+          <i class="fa-solid fa-right-from-bracket"></i>
+        </button>
       </div>
     </aside>
 
@@ -115,7 +101,7 @@
                 <i class="fa-solid fa-chart-simple icon-blue"></i>
               </div>
               <h3 class="metric-value" id="val-omzet-today">Rp 0</h3>
-              <span class="metric-sub text-positive">Realtime Lokal</span>
+              <span class="metric-sub text-positive">Sinkron Cloud</span>
             </div>
 
             <div class="metric-card glass-card">
@@ -416,7 +402,7 @@
               <table class="tx-table">
                 <thead>
                   <tr>
-                    <th style="width: 40px; text-align: center;">PILIH</th>
+                    <th style="width: 40px; text-align: center;"><input type="checkbox" id="tx-check-all" title="Pilih semua"></th>
                     <th>INFO TRANSAKSI</th>
                     <th>KARYAWAN</th>
                     <th>APLIKASI</th>
@@ -544,7 +530,7 @@
       </a>
       <a href="#voucher" class="bottom-nav-item" data-page="voucher">
         <i class="fa-solid fa-ticket"></i>
-        <span>Voucher</span>
+        <span>Kasir</span>
       </a>
       <a href="#transactions" class="bottom-nav-item" data-page="transactions">
         <i class="fa-solid fa-receipt"></i>

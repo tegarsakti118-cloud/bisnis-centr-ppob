@@ -26,6 +26,7 @@
     .input-wrapper input { width: 100%; padding: 10px 12px 10px 36px; background: #0d1117; border: 1px solid #30363d; border-radius: 8px; color: #fff; font-size: 13px; outline: none; }
     .input-wrapper input:focus { border-color: #17A897; }
     .btn { width: 100%; padding: 10px; border-radius: 8px; font-weight: 600; font-size: 13px; cursor: pointer; border: none; display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 12px; }
+    .btn:disabled { cursor: not-allowed; }
     .btn-primary { background: #17A897; color: white; }
     .btn-google { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; }
     .card-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 18px; font-size: 12px; }
@@ -66,55 +67,106 @@
     <hr class="divider">
 
     <div class="card-footer">
-      <a href="#" onclick="alert('Silakan hubungi administrator.')">Lupa password?</a>
-      <a href="#" onclick="processRegister()">Daftar Akun</a>
+      <a href="javascript:void(0)" onclick="alert('Silakan hubungi administrator.')">Lupa password?</a>
+      <a href="javascript:void(0)" onclick="processRegister()">Daftar Akun</a>
     </div>
 
     <div class="version-text">SakaPay Business Center (Cloud)</div>
   </div>
 
   <script>
-    window.addEventListener('DOMContentLoaded', async () => {
-  // Beri jeda sedikit atau pastikan benar-benar ada sesi valid sebelum redirect
-  const { data: { session } } = await window.supabaseClient.auth.getSession();
-  if (session && session.user) {
-    // Hanya lempar ke index.html jika tidak sedang berada di halaman index
-    if (!window.location.pathname.includes('index.html')) {
-      window.location.href = 'index.html';
+    const sbAuth = window.supabaseClient;
+    // Alamat index.html relatif terhadap halaman ini (aman walau di-hosting di subfolder)
+    const INDEX_URL = new URL('index.html', window.location.href).href;
+
+    function setBusy(isBusy) {
+      document.querySelectorAll('.btn').forEach(b => { b.disabled = isBusy; b.style.opacity = isBusy ? '0.6' : '1'; });
     }
-  }
-});
+
+    // Jika sudah punya sesi valid, langsung masuk ke dashboard.
+    // Error jaringan TIDAK menyebabkan redirect (mencegah loop login <-> index).
+    window.addEventListener('DOMContentLoaded', async () => {
+      if (!sbAuth) {
+        alert('Library Supabase gagal dimuat. Periksa koneksi internet lalu muat ulang halaman.');
+        return;
+      }
+      try {
+        const { data, error } = await sbAuth.auth.getSession();
+        if (!error && data.session && data.session.user) {
+          window.location.replace(INDEX_URL);
+        }
+      } catch (err) {
+        console.error('Gagal memeriksa sesi:', err);
+      }
+    });
+
+    // Tekan Enter di kolom email/password = Masuk
+    ['login-email', 'login-password'].forEach(id => {
+      document.getElementById(id).addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') processLogin();
+      });
+    });
 
     async function processLogin() {
-      const email = document.getElementById('login-email').value;
+      const email = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
       if (!email || !password) return alert('Email dan password wajib diisi!');
-      
-      const { error } = await window.supabaseClient.auth.signInWithPassword({ email, password });
-      if (error) alert('Gagal Login: ' + error.message);
-      else window.location.href = 'index.html';
+
+      setBusy(true);
+      try {
+        const { error } = await sbAuth.auth.signInWithPassword({ email, password });
+        if (error) {
+          alert('Gagal Login: ' + error.message);
+          setBusy(false);
+          return;
+        }
+        window.location.replace(INDEX_URL);
+      } catch (err) {
+        alert('Gagal Login: ' + (err.message || err));
+        setBusy(false);
+      }
     }
 
     async function processRegister() {
-      const email = document.getElementById('login-email').value;
+      const email = document.getElementById('login-email').value.trim();
       const password = document.getElementById('login-password').value;
       if (!email || !password) return alert('Isi email dan password terlebih dahulu!');
+      if (password.length < 6) return alert('Password minimal 6 karakter.');
 
-      const { error } = await window.supabaseClient.auth.signUp({ email, password });
-      if (error) alert('Gagal Daftar: ' + error.message);
-      else alert('Pendaftaran berhasil! Silakan klik Masuk.');
+      setBusy(true);
+      try {
+        const { data, error } = await sbAuth.auth.signUp({ email, password });
+        if (error) {
+          alert('Gagal Daftar: ' + error.message);
+        } else if (data.session) {
+          // Konfirmasi email dimatikan: langsung masuk
+          window.location.replace(INDEX_URL);
+          return;
+        } else {
+          alert('Pendaftaran berhasil! Cek email Anda untuk konfirmasi, lalu klik Masuk.');
+        }
+      } catch (err) {
+        alert('Gagal Daftar: ' + (err.message || err));
+      }
+      setBusy(false);
     }
 
     async function processGoogleLogin() {
-  const { error } = await window.supabaseClient.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo: window.location.origin + '/index.html' // Mengikuti domain yang sedang dibuka otomatis
+      setBusy(true);
+      try {
+        const { error } = await sbAuth.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: INDEX_URL } // harus terdaftar di Supabase > Auth > URL Configuration
+        });
+        if (error) {
+          alert('Gagal Google Login: ' + error.message);
+          setBusy(false);
+        }
+      } catch (err) {
+        alert('Gagal Google Login: ' + (err.message || err));
+        setBusy(false);
+      }
     }
-  });
-  if (error) alert('Gagal Google Login: ' + error.message);
-}
-
   </script>
 </body>
 </html>

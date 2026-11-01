@@ -1,57 +1,42 @@
-const DB_KEY = 'sakapay_local_db_v1';
-
-const defaultData = {
-  accounts: [
-    { id: 'acc_1', name: 'Kas Tunai', balance: 500000 },
-    { id: 'acc_2', name: 'BRI', balance: 1500000 },
-    { id: 'acc_3', name: 'SeaBank', balance: 750000 },
-    { id: 'acc_4', name: 'Digipos / PPOB', balance: 1200000 }
-  ],
-  transactions: [],
-  expenses: [],
-  customers: [],
-  debts: [],
-  vouchers: [
-    {
-      id: 'vouch_1',
-      name: 'Telkomsel 7GB / 7 Hari',
-      modal_saldo: 14987,
-      modal_fisik: 300,
-      price: 20000,
-      stock: 9
-    }
-  ]
-};
-
-function getAppData() {
-  const data = localStorage.getItem(DB_KEY);
-  if (!data) {
-    localStorage.setItem(DB_KEY, JSON.stringify(defaultData));
-    return defaultData;
-  }
-  try {
-    const parsed = JSON.parse(data);
-    // Pastikan struktur dasar selalu ada untuk mencegah error pada data lama
-    if (!parsed.accounts) parsed.accounts = defaultData.accounts;
-    if (!parsed.transactions) parsed.transactions = [];
-    if (!parsed.expenses) parsed.expenses = [];
-    if (!parsed.customers) parsed.customers = [];
-    if (!parsed.debts) parsed.debts = [];
-    if (!parsed.vouchers) parsed.vouchers = defaultData.vouchers;
-    return parsed;
-  } catch (e) {
-    return defaultData;
-  }
-}
-
-function saveAppData(data) {
-  localStorage.setItem(DB_KEY, JSON.stringify(data));
-}
+// ==========================================
+// SAKAPAY v2.1 - HELPER UMUM
+// (Versi cloud: data TIDAK lagi disimpan di localStorage.
+//  getAppData / saveAppData lama dihapus karena bentrok dengan app.js)
+// ==========================================
 
 function formatRupiah(number) {
+  const n = Number(number) || 0;
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
-    minimumFractionDigits: 0
-  }).format(number);
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0
+  }).format(n);
+}
+
+// Cegah XSS: semua teks dari user / database yang masuk ke innerHTML wajib lewat sini
+function escapeHtml(value) {
+  return String(value === null || value === undefined ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// ID unik (anti tabrakan walau dibuat di milidetik yang sama)
+function genId(prefix) {
+  const rand = Math.random().toString(36).slice(2, 8);
+  return `${prefix}_${Date.now()}${rand}`;
+}
+
+// Kunci tanggal lokal "YYYY-MM-DD" (bukan UTC, supaya "hari ini" benar di WIB)
+function localDateKey(dateInput) {
+  const d = new Date(dateInput);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function localMonthKey(dateInput) {
+  return localDateKey(dateInput).slice(0, 7);
 }
