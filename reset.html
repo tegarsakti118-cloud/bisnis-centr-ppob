@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Password Baru - Nexora </title>
+  <!-- Favicon & ikon aplikasi -->
+  <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="img/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
+  <!-- PWA: bisa dipasang di layar HP -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Nexora">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="js/pwa.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -33,12 +46,14 @@
     .card-footer a { color: #58a6ff; text-decoration: none; }
     .divider { margin: 16px 0; border: none; border-top: 1px solid #30363d; }
     .version-text { text-align: center; margin-top: 20px; font-size: 11px; color: #484f58; }
+    .auth-logo { display: block; margin: 0 auto 14px; height: 64px; width: auto; max-width: 100%; object-fit: contain; filter: drop-shadow(0 0 14px rgba(23, 168, 151, 0.35)); }
   </style>
 </head>
 <body>
 
   <div class="login-card">
     <div class="brand-header">
+      <img class="auth-logo" src="img/nexora-logo.png" alt="Logo Nexora" width="93" height="64" onerror="this.hidden=true;">
       <h2>Buat Password Baru</h2>
       <p id="reset-sub">Memeriksa link reset...</p>
     </div>

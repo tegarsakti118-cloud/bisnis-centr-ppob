@@ -1,0 +1,17 @@
+{
+  "id": "./index.html",
+  "name": "Nexora Business Center",
+  "short_name": "Nexora",
+  "description": "Aplikasi kasir dan keuangan Nexora",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "id",
+  "icons": [
+    { "src": "img/nexora-icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "img/nexora-icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "img/nexora-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -923,3 +923,92 @@ img, canvas, svg {
 .cash-actions .btn-primary {
   justify-content: center;
 }
+
+/* ---------- Logo Nexora ---------- */
+.brand-logo {
+  height: 36px;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 0 10px rgba(23, 168, 151, 0.35));
+}
+
+.brand-logo[hidden],
+.brand-icon[hidden],
+.top-bar-logo[hidden] {
+  display: none !important;
+}
+
+.top-bar-logo {
+  height: 30px;
+  width: auto;
+  flex-shrink: 0;
+  object-fit: contain;
+  filter: drop-shadow(0 0 8px rgba(23, 168, 151, 0.35));
+}
+
+/* HP kecil: hanya ikon logo, sedikit lebih ringkas supaya judul tidak terpotong */
+@media (max-width: 400px) {
+  .top-bar {
+    gap: 10px;
+  }
+
+  .top-bar-logo {
+    height: 26px;
+  }
+}
+
+/* ---------- PWA: tombol pasang & banner offline ---------- */
+.btn-install-app {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 11px;
+  margin-bottom: 10px;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(23, 168, 151, 0.45);
+  background: var(--primary-light);
+  color: var(--primary-color);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-install-app:hover {
+  background: var(--primary-color);
+  color: #fff;
+}
+
+.btn-install-app[hidden] {
+  display: none !important;
+}
+
+#offline-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 99998;
+  padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 8px;
+  background: #b45309;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.4;
+  transform: translateY(-110%);
+  transition: transform 0.3s ease;
+  pointer-events: none;
+}
+
+#offline-bar.show {
+  transform: translateY(0);
+}
+
+#offline-bar.online {
+  background: #0f766e;
+}
+

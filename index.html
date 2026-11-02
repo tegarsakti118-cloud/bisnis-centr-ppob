@@ -4,6 +4,19 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexora </title>
+  <!-- Favicon & ikon aplikasi -->
+  <link rel="icon" type="image/x-icon" href="img/favicon.ico">
+  <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="img/favicon-16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="img/apple-touch-icon.png">
+  <!-- PWA: bisa dipasang di layar HP -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Nexora">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <script src="js/pwa.js" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -42,7 +55,9 @@
         </div>
 
         <div class="brand">
-          <i class="fa-solid fa-wallet brand-icon"></i>
+          <img class="brand-logo" src="img/nexora-logo.png" alt="Logo Nexora" width="52" height="36"
+               onerror="this.hidden=true; this.nextElementSibling.hidden=false;">
+          <i class="fa-solid fa-wallet brand-icon" hidden></i>
           <div class="brand-text">
             <span class="brand-title">Nexora</span>
             <span class="brand-subtitle">Menu Pendukung</span>
@@ -78,6 +93,9 @@
       </div>
 
       <div class="sidebar-bottom">
+        <button type="button" id="btn-install-app" class="btn-install-app" hidden>
+          <i class="fa-solid fa-download"></i> <span>Pasang Aplikasi</span>
+        </button>
         <button type="button" id="btn-logout" class="btn-logout-full" onclick="confirmLogout()">
           <i class="fa-solid fa-right-from-bracket"></i> <span>Keluar</span>
         </button>
@@ -92,6 +110,8 @@
         <button id="hamburger-btn" class="hamburger-btn" onclick="toggleSidebar()">
           <i class="fa-solid fa-bars"></i>
         </button>
+        <img class="top-bar-logo" src="img/nexora-logo.png" alt="Logo Nexora" width="44" height="30"
+             onerror="this.hidden=true;">
         <span class="top-bar-title">Nexora Business Center</span>
       </header>
 
