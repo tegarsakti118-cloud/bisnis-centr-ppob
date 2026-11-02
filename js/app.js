@@ -200,9 +200,95 @@ async function saveCloudData(table, payload, action = 'insert', id = null) {
   }
 }
 
-// Jalankan beberapa operasi berurutan. Jika ada yang gagal: berhenti,
-// tarik ulang data dari cloud supaya layar selalu sama dengan database.
-async function runOps(ops) {
+// ------------------------------------------
+// PENYIMPANAN ATOMIK (fungsi database nx_apply_ops)
+// Semua operasi dalam satu permintaan berjalan di SATU transaksi database:
+// semua berhasil atau semua dibatalkan. Saldo & stok dikirim sebagai SELISIH
+// (bukan angka akhir dari HP), jadi aman walau dua HP dipakai bersamaan, dan setiap
+// perubahan saldo otomatis masuk Buku Mutasi Rekening.
+// Jika fungsi belum dipasang di Supabase, otomatis memakai cara lama (berurutan).
+// ------------------------------------------
+let atomicWarned = false;
+
+function isMissingFunctionError(err) {
+  const msg = String((err && err.message) || err || '') + ' ' + String((err && err.code) || '');
+  return /could not find the function|schema cache|PGRST202|42883/i.test(msg);
+}
+
+// Ubah operasi format lama [tabel, data, aksi, id] ke format server.
+// Perubahan saldo/stok yang tadinya "angka akhir" diubah jadi selisih terhadap data di layar.
+function toServerOps(ops) {
+  const list = ops.map(([table, payload, action, id]) => {
+    if (action === 'update' && table === 'accounts' && payload && 'balance' in payload) {
+      const acc = findAccount(id);
+      if (!acc) throw new Error('Rekening tidak ditemukan di layar. Muat ulang aplikasi.');
+      return { t: 'incr', table, id: String(id), amount: Number(payload.balance) - Number(acc.balance || 0) };
+    }
+    if (action === 'update' && table === 'vouchers' && payload && Object.keys(payload).length === 1 && 'stock' in payload) {
+      const v = (appData.vouchers || []).find((x) => String(x.id) === String(id));
+      if (!v) throw new Error('Produk tidak ditemukan di layar. Muat ulang aplikasi.');
+      return { t: 'incr', table, id: String(id), amount: Number(payload.stock) - Number(v.stock || 0) };
+    }
+    if (action === 'insert') return { t: 'insert', table, row: payload };
+    if (action === 'update') return { t: 'update', table, id: String(id), set: payload };
+    if (action === 'delete') return { t: 'delete', table, id: String(id) };
+    throw new Error('Aksi tidak dikenal: ' + action);
+  });
+  list.forEach((o) => {
+    if (o.t === 'incr' && !Number.isFinite(o.amount)) throw new Error('Nominal tidak valid');
+  });
+  return list.filter((o) => !(o.t === 'incr' && o.amount === 0));
+}
+
+// Setelah penyimpanan sukses, nilai saldo/stok dari SERVER dipakai sebagai acuan layar.
+// Dijalankan sesudah kode pemanggil selesai mengubah state lokal (setTimeout 0).
+function scheduleServerSync(result) {
+  if (!result) return;
+  const accs = Array.isArray(result.accounts) ? result.accounts : [];
+  const vous = Array.isArray(result.vouchers) ? result.vouchers : [];
+  setTimeout(() => {
+    let changed = false;
+    accs.forEach((a) => {
+      const acc = findAccount(a.id);
+      if (acc && Number(acc.balance) !== Number(a.balance)) { acc.balance = Number(a.balance); changed = true; }
+    });
+    vous.forEach((v) => {
+      const item = (appData.vouchers || []).find((x) => String(x.id) === String(v.id));
+      if (item && Number(item.stock) !== Number(v.stock)) { item.stock = Number(v.stock); changed = true; }
+    });
+    if (changed) refreshAllViews();
+  }, 0);
+}
+
+async function runOpsAtomic(ops, meta) {
+  let payload;
+  try {
+    payload = toServerOps(ops);
+  } catch (err) {
+    showNotification(err.message || String(err), 'error');
+    return { ok: false };
+  }
+  if (payload.length === 0) return { ok: true, data: null };
+
+  try {
+    const { data, error } = await sb.rpc('nx_apply_ops', {
+      p_ops: payload,
+      p_kind: meta.kind || null,
+      p_ref: meta.ref || null,
+      p_note: meta.note || null
+    });
+    if (error) throw error;
+    return { ok: true, data };
+  } catch (err) {
+    if (isMissingFunctionError(err)) return { ok: false, missing: true };
+    console.error('nx_apply_ops gagal:', err);
+    showNotification('Gagal menyimpan, tidak ada data yang berubah: ' + ((err && err.message) || err), 'error');
+    return { ok: false };
+  }
+}
+
+// Cara lama: berurutan satu per satu (cadangan jika fungsi atomik belum dipasang).
+async function runOpsSequential(ops) {
   for (const op of ops) {
     const ok = await saveCloudData(op[0], op[1], op[2], op[3]);
     if (!ok) {
@@ -212,6 +298,28 @@ async function runOps(ops) {
     }
   }
   return true;
+}
+
+// meta (opsional): { kind, ref, note } untuk keterangan di Buku Mutasi.
+// Jika kosong, server menentukannya sendiri dari isi operasi.
+async function runOps(ops, meta = {}) {
+  const res = await runOpsAtomic(ops, meta);
+  if (res.ok) {
+    scheduleServerSync(res.data);
+    return true;
+  }
+  if (res.missing) {
+    if (!atomicWarned) {
+      atomicWarned = true;
+      console.warn('[Nexora] Fungsi nx_apply_ops belum ada. Jalankan sql/nexora_atomik_mutasi.sql di Supabase.');
+      showNotification('Mode aman (atomik) belum aktif: jalankan sql/nexora_atomik_mutasi.sql di Supabase.', 'error');
+    }
+    return runOpsSequential(ops);
+  }
+  // Gagal di server: tidak ada yang tersimpan sebagian. Segarkan layar agar sama dengan database.
+  await fetchCloudData();
+  refreshAllViews();
+  return false;
 }
 
 // ==========================================
@@ -758,11 +866,28 @@ function initPpobPage() {
   setDefaultDateTime(document.getElementById('ppob-date'));
   formatNumberInput(document.getElementById('ppob-modal'));
   formatNumberInput(document.getElementById('ppob-jual'));
+  syncPpobOther();
+}
+
+// Kolom "Nama / Jenis Layanan" hanya tampil (dan wajib) saat layanan = "Lainnya"
+function syncPpobOther() {
+  const service = document.getElementById('ppob-service');
+  const group = document.getElementById('ppob-other-group');
+  const input = document.getElementById('ppob-other');
+  if (!service || !group || !input) return;
+  const isOther = service.value === 'Lainnya';
+  group.hidden = !isOther;
+  input.required = isOther;   // required hanya saat terlihat, agar tidak memblokir submit secara diam-diam
+  if (!isOther) input.value = '';
 }
 
 function setupPpobForm() {
   const form = document.getElementById('ppob-form');
   if (!form) return;
+
+  const serviceSel = document.getElementById('ppob-service');
+  if (serviceSel) serviceSel.addEventListener('change', syncPpobOther);
+  form.addEventListener('reset', () => setTimeout(syncPpobOther, 0));
 
   guardSubmit(form, async () => {
     const dateVal = document.getElementById('ppob-date').value;
@@ -773,9 +898,16 @@ function setupPpobForm() {
     const jual = getCleanNumber(document.getElementById('ppob-jual'));
     const payMethod = document.getElementById('ppob-pay-method').value;
     const customer = document.getElementById('ppob-customer').value.trim();
+    const otherInput = document.getElementById('ppob-other');
+    const otherService = service === 'Lainnya' && otherInput ? otherInput.value.trim() : '';
 
     if (!accountId || !payMethod) {
       showNotification('Pilih aplikasi sumber dan rekening penerima!', 'error');
+      return;
+    }
+    if (service === 'Lainnya' && !otherService) {
+      showNotification('Isi nama / jenis layanan untuk kategori Lainnya!', 'error');
+      if (otherInput) otherInput.focus();
       return;
     }
     if (jual <= 0) {
@@ -800,7 +932,8 @@ function setupPpobForm() {
     const txDate = (isNaN(parsedDate.getTime()) ? new Date() : parsedDate).toISOString();
     const isDebt = payMethod === 'Hutang';
     const debtId = isDebt ? genId('debt') : null;
-    const notes = `PPOB: ${service} (${target})`;
+    const serviceLabel = otherService ? `${service} - ${otherService}` : service;
+    const notes = `PPOB: ${serviceLabel} (${target})`;
 
     const tx = {
       id: txId,
@@ -831,6 +964,7 @@ function setupPpobForm() {
 
     form.reset();
     setDefaultDateTime(document.getElementById('ppob-date')); // reset() mengosongkan tanggal
+    syncPpobOther(); // sembunyikan kolom Lainnya setelah form di-reset
     refreshAllViews();
     showNotification('Transaksi PPOB disimpan ke cloud!', 'success');
     // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
@@ -993,6 +1127,7 @@ function loadDashboardData() {
   setText('val-commission-month', formatRupiah(fxMonth.commission));
   setText('val-transfer-fee-month', formatRupiah(fxMonth.transferFee));
   setText('val-total-tx', String(db.transactions.length));
+  setText('val-tx-today', String(todayTx.length));
 
   renderRecentTransactions(db.transactions);
   updateRevenueChart();
@@ -1787,7 +1922,7 @@ function setupAdjustForm() {
     }
 
     const selisih = newBalance - Number(acc.balance || 0);
-    const ok = await runOps([['accounts', { balance: newBalance }, 'update', acc.id]]);
+    const ok = await runOps([['accounts', { balance: newBalance }, 'update', acc.id]], { kind: 'penyesuaian', note: notes });
     if (!ok) return;
 
     acc.balance = newBalance;

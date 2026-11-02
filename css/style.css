@@ -1317,3 +1317,129 @@ body.pk-lock { overflow: hidden; }
   .kasir-actions .btn-primary i { display: none; }
   .kasir-item-sub { margin-left: 0; flex-basis: 100%; text-align: right; }
 }
+
+/* ---------- Mutasi Rekening (buku mutasi) ---------- */
+.ledger-filters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.ledger-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ledger-card {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  min-width: 0;
+}
+
+.ledger-card small {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 4px;
+}
+
+.ledger-card strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.ledger-card .ledger-sub {
+  margin: 4px 0 0;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.ledger-ok { color: #34d399; }
+.ledger-warn { color: #fbbf24; }
+.ledger-in-text { color: #34d399; }
+.ledger-out-text { color: #f87171; }
+
+.ledger-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.ledger-row:last-child {
+  border-bottom: none;
+}
+
+.ledger-ic {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+.ledger-ic.in { background: rgba(52, 211, 153, 0.15); color: #34d399; }
+.ledger-ic.out { background: rgba(248, 113, 113, 0.15); color: #f87171; }
+
+.ledger-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.ledger-main strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ledger-main .ledger-note {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ledger-main small {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.ledger-amt {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ledger-amt b {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.ledger-amt small {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+@media (min-width: 768px) {
+  .ledger-summary {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+/* Atribut hidden harus menang atas display bawaan tombol */
+.btn-primary[hidden] {
+  display: none !important;
+}
+

@@ -10,7 +10,7 @@
 //
 // Mengubah daftar file di SHELL? Naikkan VERSION agar cache lama dibersihkan.
 // ==========================================
-const VERSION = 'nexora-v3';
+const VERSION = 'nexora-v4';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -30,6 +30,7 @@ const SHELL = [
   'js/features.js',
   'js/kasir.js',
   'js/select-picker.js',
+  'js/ledger.js',
   'js/pwa.js',
   'img/nexora-logo.png',
   'img/favicon.ico',

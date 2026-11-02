@@ -74,6 +74,9 @@
           <a href="#balances" class="nav-link" data-page="balances">
             <i class="fa-solid fa-vault"></i> <span>Balance Mgmt</span>
           </a>
+          <a href="#ledger" class="nav-link" data-page="ledger">
+            <i class="fa-solid fa-book-open"></i> <span>Mutasi Rekening</span>
+          </a>
           <a href="#transfer" class="nav-link" data-page="transfer">
             <i class="fa-solid fa-right-left"></i> <span>Pindah Saldo</span>
           </a>
@@ -154,6 +157,15 @@
               </div>
               <h3 class="metric-value" id="val-total-tx">0</h3>
               <span class="metric-sub text-muted">Transaksi Tercatat</span>
+            </div>
+
+            <div class="metric-card glass-card">
+              <div class="metric-header">
+                <span>Total Transaksi Hari Ini</span>
+                <i class="fa-solid fa-receipt icon-teal"></i>
+              </div>
+              <h3 class="metric-value" id="val-tx-today">0</h3>
+              <span class="metric-sub text-muted">Transaksi hari ini</span>
             </div>
 
             <div class="metric-card glass-card">
@@ -322,11 +334,19 @@
                 <label><i class="fa-solid fa-list-check"></i> Produk / Layanan PPOB</label>
                 <select id="ppob-service" class="glass-input" required>
                   <option value="Pulsa Reguler">Pulsa Reguler</option>
-                  <option value="Paket Data / Internet">Paket Data / Internet</option>
-                  <option value="Token Listrik PLN">Token Listrik PLN</option>
+                  <option value="Paket Data">Paket Data</option>
                   <option value="Voucher Game">Voucher Game</option>
-                  <option value="Bayar Tagihan BPJS/PDAM">Bayar Tagihan BPJS/PDAM</option>
+                  <option value="Token Listrik PLN">Token Listrik PLN</option>
+                  <option value="Tagihan PLN">Tagihan PLN</option>
+                  <option value="Bayar Tagihan">Bayar Tagihan</option>
+                  <option value="Lainnya">Lainnya</option>
                 </select>
+              </div>
+
+              <!-- Hanya tampil jika layanan "Lainnya" dipilih (diatur oleh syncPpobOther di app.js) -->
+              <div class="form-group" id="ppob-other-group" style="margin-bottom: 0;" hidden>
+                <label><i class="fa-solid fa-pen"></i> Nama / Jenis Layanan Lainnya</label>
+                <input type="text" id="ppob-other" class="glass-input" maxlength="80" placeholder="Tulis nama atau jenis layanan..." autocomplete="off">
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
@@ -605,6 +625,43 @@
         </section>
 
         <!-- PAGE: BALANCES -->
+        <!-- ===== MUTASI REKENING (Buku Mutasi) ===== -->
+        <section id="page-ledger" class="page-view">
+          <div class="card-title flex-between" style="margin-bottom: 16px;">
+            <h4><i class="fa-solid fa-book-open"></i> Mutasi Rekening</h4>
+            <button type="button" class="btn-primary" id="btn-ledger-export" style="font-size: 12px; padding: 6px 12px;">
+              <i class="fa-solid fa-file-excel"></i> Excel
+            </button>
+          </div>
+
+          <div class="glass-card" style="padding: 16px; margin-bottom: 16px;">
+            <div class="ledger-filters">
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Rekening</label>
+                <select id="ledger-account" class="glass-input"></select>
+              </div>
+              <div class="form-group" style="margin-bottom: 0;">
+                <label>Periode</label>
+                <select id="ledger-period" class="glass-input">
+                  <option value="7">7 hari terakhir</option>
+                  <option value="30" selected>30 hari terakhir</option>
+                  <option value="month">Bulan ini</option>
+                  <option value="all">Semua</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <div class="ledger-summary" id="ledger-summary"></div>
+
+          <div class="glass-card" style="padding: 8px 16px 16px;">
+            <div id="ledger-list"></div>
+            <button type="button" class="btn-primary" id="btn-ledger-more" style="width: 100%; justify-content: center; margin-top: 12px;" hidden>
+              Tampilkan lebih banyak
+            </button>
+          </div>
+        </section>
+
         <section id="page-balances" class="page-view">
           <div class="card-title flex-between" style="margin-bottom: 16px;">
             <h4><i class="fa-solid fa-vault"></i> Daftar Akun & Saldo</h4>
@@ -943,5 +1000,6 @@
   <script src="js/features.js"></script>
   <script src="js/kasir.js"></script>
   <script src="js/select-picker.js"></script>
+  <script src="js/ledger.js"></script>
 </body>
 </html>
