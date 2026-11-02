@@ -252,9 +252,14 @@
                   <option value="Tarik Tunai">Tarik Tunai</option>
                   <option value="Transfer Bank Lain">Transfer Bank Lain</option>
                   <option value="Transfer Sesama">Transfer Sesama</option>
-                  <option value="Topup Gopay">Topup Gopay</option>
+                  <option value="Setor Pinjaman">Setor Pinjaman</option>
+                  <option value="Virtual Account">Virtual Account</option>
+                  <option value="Topup Ewallet">Topup Ewallet</option>
+                  <option value="Topup Dana">Topup Dana</option>
+                  <option value="Topup Spay">Topup Spay</option>
                   <option value="Topup Ovo">Topup Ovo</option>
-                  <option value="Topup Shopeepay">Topup Shopeepay</option>
+                  <option value="Topup Gopay">Topup Gopay</option>
+                  <option value="Topup Linkaja">Topup Linkaja</option>
                 </select>
               </div>
 
@@ -358,58 +363,129 @@
           </div>
         </section>
 
-                <!-- PAGE: KASIR & STOK BARANG -->
+        <!-- PAGE: KASIR & STOK BARANG -->
         <section id="page-voucher" class="page-view">
-          <div class="card-title flex-between" style="margin-bottom: 16px;">
-            <h4><i class="fa-solid fa-cash-register"></i> Kasir & Stok Barang</h4>
-            <button class="btn-primary" id="btn-add-voucher-modal" style="font-size: 12px; padding: 6px 12px;">
-              <i class="fa-solid fa-plus"></i> Tambah Produk
-            </button>
-          </div>
 
-          <div class="glass-card" style="padding: 20px; margin-bottom: 20px;">
-            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-cart-shopping"></i> Form Transaksi Kasir</h5>
-            <form id="sell-voucher-form" style="display: flex; flex-direction: column; gap: 14px;">
-              <div class="form-group" style="margin-bottom: 0;">
-                <label>Pilih Produk / Barang</label>
-                <select id="vouch-select-item" class="glass-input" required></select>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 0;">
-                <label>Akun / Sumber Modal Barang</label>
-                <select id="vouch-select-account" class="glass-input" required></select>
-              </div>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-                <div class="form-group" style="margin-bottom: 0;">
-                  <label>Jumlah (Pcs)</label>
-                  <input type="number" id="vouch-qty" class="glass-input" value="1" min="1" required>
-                </div>
-                <div class="form-group" style="margin-bottom: 0;">
-                  <label>Metode Pembayaran</label>
-                  <select id="vouch-pay-method" class="glass-input" required>
-                    <option value="">-- Pilih Pembayaran --</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 0;">
-                <label>Nama Pelanggan (Wajib jika Hutang)</label>
-                <input type="text" id="vouch-customer-name" class="glass-input" placeholder="Nama pembeli...">
-              </div>
-
-              <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px; margin-top: 4px;">
-                <i class="fa-solid fa-cart-plus"></i> Proses Penjualan Kasir
+          <!-- TAMPILAN 1: PENCARIAN PRODUK + KERANJANG -->
+          <div id="kasir-cart-view" class="kasir-wrap">
+            <div class="card-title flex-between kasir-head">
+              <h4><i class="fa-solid fa-cash-register"></i> Transaksi Kasir</h4>
+              <button type="button" class="btn-primary kasir-add-btn" id="btn-add-voucher-modal">
+                <i class="fa-solid fa-plus"></i> Tambah Produk
               </button>
-            </form>
-          </div>
+            </div>
 
-          <div class="glass-card" style="padding: 20px;">
-            <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-boxes-stacked"></i> Daftar Stok Produk Aktif</h5>
-            <div class="tx-list" id="voucher-master-list">
-              <p class="empty-state">Belum ada stok produk.</p>
+            <div class="glass-card kasir-card">
+              <div class="form-group">
+                <label for="kasir-date"><i class="fa-solid fa-calendar-days"></i> Tanggal &amp; Jam (Opsional)</label>
+                <input type="datetime-local" id="kasir-date" class="glass-input">
+                <small class="kasir-hint"><i class="fa-solid fa-circle-info"></i> Kosongkan untuk memakai waktu sekarang. Tanggal tidak boleh di masa depan.</small>
+              </div>
+            </div>
+
+            <div class="kasir-search">
+              <div class="glass-card kasir-search-box">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input type="text" id="kasir-search" placeholder="Cari nama produk atau barcode..." autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cari produk">
+              </div>
+              <div id="kasir-results" class="kasir-results" role="listbox" hidden></div>
+            </div>
+
+            <div class="glass-card kasir-cart-card">
+              <div class="kasir-cart-head">
+                <span><i class="fa-solid fa-cart-shopping"></i> Keranjang</span>
+                <span id="kasir-cart-count">0 item</span>
+              </div>
+              <div id="kasir-cart-list"></div>
+            </div>
+
+            <div class="glass-card kasir-total-bar">
+              <div class="kasir-total-row">
+                <span>Total belanja</span>
+                <strong id="kasir-cart-total">Rp0</strong>
+              </div>
+              <button type="button" class="btn-primary kasir-btn-next" id="kasir-btn-next" disabled>
+                <i class="fa-solid fa-forward"></i> Lanjutkan Pembayaran
+              </button>
+            </div>
+
+            <div class="glass-card" style="padding: 20px;">
+              <h5 style="margin-bottom: 12px; font-size: 15px;"><i class="fa-solid fa-boxes-stacked"></i> Daftar Stok Produk Aktif</h5>
+              <div class="tx-list" id="voucher-master-list">
+                <p class="empty-state">Belum ada stok produk.</p>
+              </div>
             </div>
           </div>
+
+          <!-- TAMPILAN 2: PEMBAYARAN -->
+          <form id="sell-voucher-form" class="kasir-wrap kasir-pay" novalidate hidden>
+            <div class="card-title flex-between kasir-head">
+              <h4><i class="fa-solid fa-credit-card"></i> Pembayaran</h4>
+              <button type="button" class="btn-mini btn-mini-blue kasir-back" id="kasir-pay-back">
+                <i class="fa-solid fa-arrow-left"></i> Keranjang
+              </button>
+            </div>
+
+            <div class="glass-card kasir-pay-total">
+              <span>Total tagihan</span>
+              <strong id="kasir-pay-subtotal">Rp0</strong>
+              <small id="kasir-pay-items"></small>
+            </div>
+
+            <div class="glass-card kasir-card">
+              <div class="kasir-two">
+                <div class="form-group">
+                  <label for="kasir-disc-rp">Diskon (Rp)</label>
+                  <input type="text" inputmode="numeric" id="kasir-disc-rp" class="glass-input" placeholder="0" autocomplete="off">
+                </div>
+                <div class="form-group">
+                  <label for="kasir-disc-pct">Diskon (%)</label>
+                  <input type="text" inputmode="decimal" id="kasir-disc-pct" class="glass-input" placeholder="0" autocomplete="off">
+                </div>
+              </div>
+              <small class="kasir-hint" id="kasir-disc-hint">&asymp; Rp0 dari 0%</small>
+
+              <div class="form-group">
+                <label for="vouch-customer-name">Nama Pelanggan (Opsional)</label>
+                <input type="text" id="vouch-customer-name" class="glass-input" placeholder="Boleh dikosongkan (wajib jika Hutang)" autocomplete="off">
+              </div>
+
+              <div class="form-group">
+                <label for="vouch-pay-method">Metode Pembayaran</label>
+                <select id="vouch-pay-method" class="glass-input">
+                  <option value="">-- Pilih Pembayaran --</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label for="vouch-select-account">Akun / Sumber Modal Barang</label>
+                <select id="vouch-select-account" class="glass-input"></select>
+              </div>
+            </div>
+
+            <div class="glass-card kasir-card" id="kasir-paid-wrap">
+              <div class="form-group">
+                <label for="kasir-paid">Nominal Bayar</label>
+                <input type="text" inputmode="numeric" id="kasir-paid" class="glass-input kasir-paid-input" placeholder="0" autocomplete="off">
+              </div>
+              <div class="kasir-quick">
+                <button type="button" class="kq kq-blue" data-amt="10000">Rp 10.000</button>
+                <button type="button" class="kq kq-green" data-amt="20000">Rp 20.000</button>
+                <button type="button" class="kq kq-amber" data-amt="50000">Rp 50.000</button>
+                <button type="button" class="kq kq-red" data-amt="100000">Rp 100.000</button>
+                <button type="button" class="kq kq-violet kq-wide" data-amt="exact">Bayar Pas</button>
+              </div>
+            </div>
+
+            <div class="kasir-status ok" id="kasir-after-disc"><i class="fa-solid fa-circle-check"></i> <span>Total Setelah Diskon: Rp0</span></div>
+            <div class="kasir-status warn" id="kasir-change"><i class="fa-solid fa-hand-holding-dollar"></i> <span>Kurang: Rp0</span></div>
+
+            <div class="kasir-actions">
+              <button type="submit" class="btn-primary kasir-act-save"><i class="fa-solid fa-floppy-disk"></i> Simpan</button>
+              <button type="button" class="btn-primary kasir-act-print" id="kasir-btn-print"><i class="fa-solid fa-print"></i> Cetak</button>
+              <button type="button" class="btn-primary kasir-act-cancel" id="kasir-btn-cancel"><i class="fa-solid fa-xmark"></i> Batal</button>
+            </div>
+          </form>
         </section>
 
         <!-- PAGE: CATATAN HUTANG -->
@@ -432,6 +508,44 @@
             <button class="btn-primary" id="btn-tx-page-new" style="font-size: 12px; padding: 6px 12px;" onclick="switchPage('tariksetor')">
               <i class="fa-solid fa-plus"></i> Transaksi Baru
             </button>
+          </div>
+
+          <!-- FILTER TANGGAL RIWAYAT -->
+          <div class="glass-card tx-filter-card" id="tx-filter-card">
+            <div class="tx-filter-title"><i class="fa-solid fa-filter"></i> Filter Tanggal</div>
+            <div class="tx-filter-chips" id="tx-filter-chips">
+              <button type="button" class="tx-chip active" data-range="all">Semua</button>
+              <button type="button" class="tx-chip" data-range="today">Hari ini</button>
+              <button type="button" class="tx-chip" data-range="yesterday">Kemarin</button>
+              <button type="button" class="tx-chip" data-range="last7">7 hari terakhir</button>
+              <button type="button" class="tx-chip" data-range="last30">30 hari terakhir</button>
+              <button type="button" class="tx-chip" data-range="thisMonth">Bulan ini</button>
+              <button type="button" class="tx-chip" data-range="lastMonth">Bulan lalu</button>
+              <button type="button" class="tx-chip" data-range="custom"><i class="fa-solid fa-calendar-days"></i> Pilih tanggal sendiri</button>
+            </div>
+
+            <div class="tx-filter-custom" id="tx-filter-custom" hidden>
+              <div class="tx-filter-dates">
+                <div>
+                  <label for="tx-filter-start">Tanggal mulai</label>
+                  <input type="date" id="tx-filter-start" class="glass-input">
+                </div>
+                <div>
+                  <label for="tx-filter-end">Tanggal akhir</label>
+                  <input type="date" id="tx-filter-end" class="glass-input">
+                </div>
+              </div>
+              <div class="tx-filter-actions">
+                <button type="button" class="btn-primary" id="btn-tx-filter-apply"><i class="fa-solid fa-check"></i> Terapkan Filter</button>
+                <button type="button" class="btn-primary tx-btn-ghost" id="btn-tx-filter-reset"><i class="fa-solid fa-rotate-left"></i> Reset</button>
+              </div>
+              <p class="tx-filter-hint">Isi satu tanggal saja untuk melihat transaksi pada satu hari.</p>
+            </div>
+
+            <div class="tx-filter-active" id="tx-filter-active" hidden>
+              <span class="tx-filter-active-text" id="tx-filter-active-text"></span>
+              <button type="button" class="tx-filter-clear" id="btn-tx-filter-clear" title="Hapus filter"><i class="fa-solid fa-xmark"></i> Reset</button>
+            </div>
           </div>
 
           <!-- Tombol Cetak Struk Gabungan & Info Total Data -->
@@ -827,5 +941,7 @@
   <script src="js/config.js"></script>
   <script src="js/app.js"></script>
   <script src="js/features.js"></script>
+  <script src="js/kasir.js"></script>
+  <script src="js/select-picker.js"></script>
 </body>
 </html>

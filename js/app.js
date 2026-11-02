@@ -574,6 +574,18 @@ function bindUi() {
     renderFullTransactionsList();
   });
 
+  // Filter tanggal Riwayat Transaksi
+  const txChips = document.getElementById('tx-filter-chips');
+  if (txChips) {
+    txChips.addEventListener('click', (e) => {
+      const chip = e.target.closest('[data-range]');
+      if (chip) selectTxRange(chip.dataset.range);
+    });
+  }
+  on('btn-tx-filter-apply', 'click', applyCustomTxFilter);
+  on('btn-tx-filter-reset', 'click', resetTxFilter);
+  on('btn-tx-filter-clear', 'click', resetTxFilter);
+
   on('tx-check-all', 'change', (e) => {
     document.querySelectorAll('.tx-checkbox').forEach((cb) => { cb.checked = e.target.checked; });
   });
@@ -833,15 +845,11 @@ function setupPpobForm() {
 function initVoucherPage() {
   const vouchers = appData.vouchers || [];
 
-  setSelectOptions(
-    document.getElementById('vouch-select-item'),
-    '<option value="">-- Pilih Produk / Barang --</option>' +
-      vouchers.map((v) =>
-        `<option value="${escapeHtml(v.id)}">${escapeHtml(`${v.name} - Stok: ${v.stock} (${formatRupiah(v.price)})`)}</option>`
-      ).join('')
-  );
   setSelectOptions(document.getElementById('vouch-select-account'), accountOptions('-- Pilih Akun / Sumber Modal (Inject) --'));
   setSelectOptions(document.getElementById('vouch-pay-method'), accountOptions('-- Pilih Pembayaran --', true));
+
+  // Keranjang & pencarian produk (js/kasir.js)
+  if (typeof renderKasirCart === 'function') renderKasirCart();
 
   const listEl = document.getElementById('voucher-master-list');
   if (!listEl) return;
@@ -943,93 +951,11 @@ function deleteProduct(vouchId) {
   }, true);
 }
 
+// UI keranjang, pencarian, pembayaran, dan penyimpanan transaksi kasir ada di js/kasir.js
+// (data tetap disimpan per produk sebagai transaksi type 'voucher', jadi struktur database tidak berubah).
 function setupVoucherForm() {
-  const form = document.getElementById('sell-voucher-form');
-  if (!form) return;
-
-  guardSubmit(form, async () => {
-    const vouchId = document.getElementById('vouch-select-item').value;
-    const accountId = document.getElementById('vouch-select-account').value;
-    const qty = parseInt(document.getElementById('vouch-qty').value, 10) || 0;
-    const payMethod = document.getElementById('vouch-pay-method').value;
-    const customerName = document.getElementById('vouch-customer-name').value.trim();
-
-    if (!vouchId || !accountId || !payMethod) {
-      showNotification('Lengkapi semua pilihan form kasir!', 'error');
-      return;
-    }
-    if (qty < 1) {
-      showNotification('Jumlah minimal 1 pcs!', 'error');
-      return;
-    }
-    if (payMethod === 'Hutang' && !customerName) {
-      showNotification('Nama pelanggan wajib diisi untuk transaksi hutang!', 'error');
-      return;
-    }
-
-    const vouch = appData.vouchers.find((v) => String(v.id) === String(vouchId));
-    const accInject = findAccount(accountId);
-    const receiver = findAccount(payMethod);
-
-    if (!vouch || !accInject || (payMethod !== 'Hutang' && !receiver)) {
-      showNotification('Produk atau akun tidak ditemukan!', 'error');
-      return;
-    }
-    if (Number(vouch.stock) < qty) {
-      showNotification(`Stok ${vouch.name} tidak mencukupi! Sisa: ${vouch.stock}`, 'error');
-      return;
-    }
-
-    const totalModalSaldo = Number(vouch.modal_saldo || 0) * qty;
-    const totalModalFisik = Number(vouch.modal_fisik || 0) * qty;
-    const totalJual = Number(vouch.price || 0) * qty;
-    const totalProfit = totalJual - (totalModalSaldo + totalModalFisik);
-    if (!(await confirmLowBalance(accInject, totalModalSaldo))) return;
-
-    const txId = genId('tx');
-    const txDate = new Date().toISOString();
-    const isDebt = payMethod === 'Hutang';
-    const debtId = isDebt ? genId('debt') : null;
-    const notes = `Kasir: ${vouch.name} (${qty} pcs) via ${accInject.name}`;
-
-    const tx = {
-      id: txId,
-      user_id: currentUserId,
-      type: 'voucher',
-      accountId: String(accInject.id),
-      payAccountId: receiver ? String(receiver.id) : 'Hutang',
-      voucherId: String(vouch.id),
-      quantity: qty,
-      debtId,
-      notes,
-      amount: totalModalSaldo,
-      admin_fee: totalJual,
-      cost_price: totalModalSaldo + totalModalFisik,
-      profit: totalProfit,
-      date: txDate,
-      status: isDebt ? 'Hutang' : 'Success'
-    };
-
-    const debt = isDebt ? {
-      id: debtId, user_id: currentUserId, transactionId: txId,
-      customer: customerName, amount: totalJual, description: notes, date: txDate
-    } : null;
-
-    const deltas = [{ accountId: accInject.id, delta: -totalModalSaldo }];
-    if (receiver) deltas.push({ accountId: receiver.id, delta: totalJual });
-
-    const ok = await recordTransaction({
-      tx, deltas, debt, voucher: vouch, newStock: Number(vouch.stock) - qty
-    });
-    if (!ok) return;
-
-    form.reset();
-    document.getElementById('vouch-qty').value = 1;
-    refreshAllViews();
-    showNotification('Transaksi kasir berhasil disimpan!', 'success');
-    // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
-    if (!isDebt) switchPage('transactions');
-  });
+  if (typeof setupKasirUi === 'function') setupKasirUi();
+  else console.error('[Nexora] js/kasir.js belum termuat.');
 }
 
 // ==========================================
@@ -1157,8 +1083,213 @@ function updateRevenueChart() {
 // RIWAYAT TRANSAKSI
 // ==========================================
 
-function loadTransactionsPage() {
+// ------------------------------------------
+// FILTER TANGGAL RIWAYAT
+// Filter dijalankan di query Supabase (bukan sekadar menyembunyikan baris).
+// appData.transactions TIDAK diubah, karena dipakai dashboard, saldo, dan laporan.
+// Batas tanggal dihitung di zona waktu lokal pengguna lalu diubah ke ISO (UTC) untuk query,
+// sehingga cocok dengan nilai `date` yang disimpan lewat toISOString().
+// Rentang inklusif: >= 00:00:00 tanggal mulai dan < 00:00:00 hari setelah tanggal akhir
+// (setara sampai 23:59:59.999 tanggal akhir).
+// ------------------------------------------
+const TX_PRESET_LABELS = {
+  today: 'Hari ini', yesterday: 'Kemarin', last7: '7 hari terakhir', last30: '30 hari terakhir',
+  thisMonth: 'Bulan ini', lastMonth: 'Bulan lalu', custom: 'Tanggal sendiri'
+};
+// preset: 'all' | kunci di TX_PRESET_LABELS. rows === null berarti belum dimuat.
+const txFilter = { preset: 'all', customStart: null, customEndExcl: null, rows: null, loading: false, error: false };
+let txCustomOpen = false;
+let txFilterSeq = 0;
+
+function startOfLocalDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
+function addLocalDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 0, 0, 0, 0); }
+
+function parseDateInput(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
+  if (!m) return null;
+  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+// Mengembalikan { start, endExcl } dalam waktu lokal. Preset dihitung ulang tiap query (aman saat lewat tengah malam).
+function getTxRange() {
+  const p = txFilter.preset;
+  if (p === 'all') return null;
+  if (p === 'custom') return { start: txFilter.customStart, endExcl: txFilter.customEndExcl };
+  const today = startOfLocalDay(new Date());
+  const y = today.getFullYear();
+  const m = today.getMonth();
+  switch (p) {
+    case 'today': return { start: today, endExcl: addLocalDays(today, 1) };
+    case 'yesterday': return { start: addLocalDays(today, -1), endExcl: today };
+    case 'last7': return { start: addLocalDays(today, -6), endExcl: addLocalDays(today, 1) };
+    case 'last30': return { start: addLocalDays(today, -29), endExcl: addLocalDays(today, 1) };
+    case 'thisMonth': return { start: new Date(y, m, 1), endExcl: new Date(y, m + 1, 1) };
+    case 'lastMonth': return { start: new Date(y, m - 1, 1), endExcl: new Date(y, m, 1) };
+    default: return null;
+  }
+}
+
+function formatTxDay(d) {
+  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function txPeriodText(range) {
+  const last = addLocalDays(range.endExcl, -1);
+  return range.start.getTime() === last.getTime()
+    ? formatTxDay(range.start)
+    : `${formatTxDay(range.start)} - ${formatTxDay(last)}`;
+}
+
+// Ambil transaksi milik akun yang login pada rentang tanggal (bertahap per 1000 baris)
+async function fetchTransactionsInRange(start, endExcl) {
+  const size = 1000;
+  let from = 0;
+  let all = [];
+  for (;;) {
+    const { data, error } = await sb.from('transactions').select('*')
+      .eq('user_id', currentUserId)
+      .gte('date', start.toISOString())
+      .lt('date', endExcl.toISOString())
+      .order('date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + size - 1);
+    if (error) return { data: null, error };
+    all = all.concat(data || []);
+    if (!data || data.length < size) break;
+    from += size;
+  }
+  return { data: all, error: null };
+}
+
+function renderTxFilterUi() {
+  document.querySelectorAll('#tx-filter-chips .tx-chip').forEach((chip) => {
+    const r = chip.dataset.range;
+    const on = r === 'custom' ? (txCustomOpen || txFilter.preset === 'custom') : r === txFilter.preset;
+    chip.classList.toggle('active', on);
+  });
+
+  const customEl = document.getElementById('tx-filter-custom');
+  if (customEl) customEl.hidden = !txCustomOpen;
+
+  const activeEl = document.getElementById('tx-filter-active');
+  const textEl = document.getElementById('tx-filter-active-text');
+  if (!activeEl || !textEl) return;
+  const range = getTxRange();
+  if (!range) {
+    activeEl.hidden = true;
+    textEl.textContent = '';
+  } else {
+    activeEl.hidden = false;
+    textEl.textContent = `Filter aktif: ${TX_PRESET_LABELS[txFilter.preset]} (${txPeriodText(range)})`;
+  }
+}
+
+async function runTxFilter() {
+  const range = getTxRange();
+  if (!range) {
+    txFilter.rows = null;
+    txFilter.loading = false;
+    txFilter.error = false;
+    renderTxFilterUi();
+    renderFullTransactionsList();
+    return;
+  }
+
+  const seq = ++txFilterSeq; // abaikan hasil query lama jika filter sudah berganti
+  txFilter.loading = true;
+  renderTxFilterUi();
   renderFullTransactionsList();
+
+  try {
+    const { data, error } = await fetchTransactionsInRange(range.start, range.endExcl);
+    if (seq !== txFilterSeq) return;
+    if (error) throw error;
+    txFilter.rows = data || [];
+    txFilter.error = false;
+  } catch (err) {
+    if (seq !== txFilterSeq) return;
+    console.error('Gagal memfilter transaksi:', err);
+    txFilter.rows = [];
+    txFilter.error = true;
+    if (isAuthError(err)) {
+      showNotification('Sesi login berakhir. Silakan masuk kembali.', 'error');
+      setTimeout(handleLogout, 1500);
+    } else {
+      showNotification('Gagal memuat transaksi periode ini. Periksa koneksi lalu coba lagi.', 'error');
+    }
+  }
+  txFilter.loading = false;
+  renderTxFilterUi();
+  renderFullTransactionsList();
+}
+
+function selectTxRange(range) {
+  if (range === 'all') { resetTxFilter(); return; }
+
+  if (range === 'custom') {
+    txCustomOpen = true;
+    const startEl = document.getElementById('tx-filter-start');
+    const endEl = document.getElementById('tx-filter-end');
+    const todayKey = localDateKey(new Date());
+    if (startEl && !startEl.value) startEl.value = todayKey;
+    if (endEl && !endEl.value) endEl.value = todayKey;
+    renderTxFilterUi();
+    return;
+  }
+
+  if (!TX_PRESET_LABELS[range]) return;
+  txCustomOpen = false;
+  txFilter.preset = range;
+  txFilter.rows = null;
+  runTxFilter();
+}
+
+function applyCustomTxFilter() {
+  const startEl = document.getElementById('tx-filter-start');
+  const endEl = document.getElementById('tx-filter-end');
+  let start = parseDateInput(startEl && startEl.value);
+  let end = parseDateInput(endEl && endEl.value);
+
+  if (!start && !end) { showNotification('Pilih tanggal mulai atau tanggal akhir terlebih dahulu.', 'error'); return; }
+  // Satu tanggal saja = transaksi pada hari itu
+  if (!start) { start = end; startEl.value = endEl.value; }
+  if (!end) { end = start; endEl.value = startEl.value; }
+  if (start.getTime() > end.getTime()) { showNotification('Tanggal mulai tidak boleh setelah tanggal akhir.', 'error'); return; }
+
+  txFilter.preset = 'custom';
+  txFilter.customStart = start;
+  txFilter.customEndExcl = addLocalDays(end, 1);
+  txFilter.rows = null;
+  txCustomOpen = true;
+  runTxFilter();
+}
+
+function resetTxFilter() {
+  txFilterSeq++; // batalkan query yang masih berjalan
+  txFilter.preset = 'all';
+  txFilter.customStart = null;
+  txFilter.customEndExcl = null;
+  txFilter.rows = null;
+  txFilter.loading = false;
+  txFilter.error = false;
+  txCustomOpen = false;
+  const startEl = document.getElementById('tx-filter-start');
+  const endEl = document.getElementById('tx-filter-end');
+  if (startEl) startEl.value = '';
+  if (endEl) endEl.value = '';
+  renderTxFilterUi();
+  renderFullTransactionsList();
+}
+
+function loadTransactionsPage() {
+  renderTxFilterUi();
+  if (txFilter.preset === 'all') {
+    renderFullTransactionsList();
+  } else {
+    // Muat ulang dari database (mis. setelah hapus/tambah transaksi) agar hasil selalu terbaru
+    runTxFilter();
+  }
 }
 
 function renderFullTransactionsList() {
@@ -1166,7 +1297,14 @@ function renderFullTransactionsList() {
   const countEl = document.getElementById('tx-count-label');
   if (!tbodyEl) return;
 
-  let list = [...appData.transactions].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const filtered = txFilter.preset !== 'all';
+  if (filtered && txFilter.rows === null) {
+    if (countEl) countEl.textContent = 'Memuat data...';
+    tbodyEl.innerHTML = '<tr><td colspan="10" class="empty-state" style="text-align:center; padding:24px;">Memuat transaksi...</td></tr>';
+    return;
+  }
+
+  let list = [...(filtered ? txFilter.rows : appData.transactions)].sort((a, b) => new Date(b.date) - new Date(a.date));
   if (txSearchTerm) {
     list = list.filter((tx) =>
       [tx.id, tx.notes, txTypeLabel(tx.type), tx.status]
@@ -1180,7 +1318,10 @@ function renderFullTransactionsList() {
   if (checkAll) checkAll.checked = false;
 
   if (list.length === 0) {
-    tbodyEl.innerHTML = '<tr><td colspan="10" class="empty-state" style="text-align:center; padding:24px;">Belum ada transaksi tercatat.</td></tr>';
+    const emptyMsg = filtered
+      ? (txFilter.error ? 'Gagal memuat transaksi periode ini. Coba pilih filter lagi.' : 'Tidak ada transaksi pada periode ini')
+      : 'Belum ada transaksi tercatat.';
+    tbodyEl.innerHTML = `<tr><td colspan="10" class="empty-state" style="text-align:center; padding:24px;">${emptyMsg}</td></tr>`;
     return;
   }
 
