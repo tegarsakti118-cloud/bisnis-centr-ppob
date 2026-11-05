@@ -26,7 +26,6 @@ let appData = {
 let currentUserId = null;
 let currentUserEmail = '';
 let revenueChart = null;
-let txSearchTerm = '';
 let uiBound = false;
 
 const CLOUD_TABLES = ['accounts', 'transactions', 'vouchers', 'debts', 'expenses', 'customers', 'debt_payments'];
@@ -563,7 +562,8 @@ function guardSubmit(form, handler) {
       showNotification('Terjadi kesalahan: ' + (err.message || err), 'error');
     } finally {
       form.dataset.busy = '0';
-      if (btn) btn.disabled = false;
+      // Pasangan aplikasi pengirim = penerima (js/validation.js): tombol proses tetap nonaktif
+      if (btn) btn.disabled = form.dataset.pairInvalid === '1';
     }
   };
 }
@@ -677,27 +677,6 @@ function bindUi() {
   on('btn-export-daily', 'click', () => exportTransactionsExcel('daily'));
   on('btn-export-monthly', 'click', () => exportTransactionsExcel('monthly'));
 
-  on('search-tx-input', 'input', (e) => {
-    txSearchTerm = e.target.value.trim().toLowerCase();
-    renderFullTransactionsList();
-  });
-
-  // Filter tanggal Riwayat Transaksi
-  const txChips = document.getElementById('tx-filter-chips');
-  if (txChips) {
-    txChips.addEventListener('click', (e) => {
-      const chip = e.target.closest('[data-range]');
-      if (chip) selectTxRange(chip.dataset.range);
-    });
-  }
-  on('btn-tx-filter-apply', 'click', applyCustomTxFilter);
-  on('btn-tx-filter-reset', 'click', resetTxFilter);
-  on('btn-tx-filter-clear', 'click', resetTxFilter);
-
-  on('tx-check-all', 'change', (e) => {
-    document.querySelectorAll('.tx-checkbox').forEach((cb) => { cb.checked = e.target.checked; });
-  });
-
   const debtListEl = document.getElementById('debt-list');
   if (debtListEl) {
     debtListEl.addEventListener('click', (e) => {
@@ -776,13 +755,29 @@ function initTarikSetorPage() {
   setDefaultDateTime(document.getElementById('ts-date'));
   formatNumberInput(document.getElementById('ts-admin-bank'));
   formatNumberInput(document.getElementById('ts-admin-agen'));
+  if (typeof initTarikTunaiFields === 'function') initTarikTunaiFields();
 }
 
 function setupTarikSetorForm() {
   const form = document.getElementById('tarik-setor-form');
   if (!form) return;
 
+  // Validasi langsung: aplikasi sumber (ts-account) tidak boleh sama dengan rekening penerima (ts-pay-method).
+  // Layanan "Tarik Tunai" punya validasi sendiri (tarik-tunai.js), jadi pasangan ini tidak berlaku di sana.
+  if (window.NxValidation) {
+    const accEl = document.getElementById('ts-account');
+    const payEl = document.getElementById('ts-pay-method');
+    const svcEl = document.getElementById('ts-service');
+    NxValidation.bindPairGuard(form, [accEl, payEl, svcEl],
+      () => (svcEl.value === 'Tarik Tunai' ? null : [accEl.value, payEl.value]), payEl);
+  }
+
   guardSubmit(form, async () => {
+    // Layanan "Tarik Tunai" memakai alur khusus (Admin Luar / Admin Dalam) di js/tarik-tunai.js
+    if (document.getElementById('ts-service').value === 'Tarik Tunai' && typeof submitTarikTunai === 'function') {
+      await submitTarikTunai(form);
+      return;
+    }
     const dateVal = document.getElementById('ts-date').value;
     const accountId = document.getElementById('ts-account').value;
     const service = document.getElementById('ts-service').value;
@@ -794,6 +789,11 @@ function setupTarikSetorForm() {
 
     if (!accountId || !payAccountId) {
       showNotification('Pilih akun sumber dan rekening penerima!', 'error');
+      return;
+    }
+    const pairCheck = NxValidation.validateAccountPair(accountId, payAccountId);
+    if (!pairCheck.ok) {
+      showNotification(pairCheck.message, 'error');
       return;
     }
     if (jual <= 0) {
@@ -889,6 +889,12 @@ function setupPpobForm() {
   if (serviceSel) serviceSel.addEventListener('change', syncPpobOther);
   form.addEventListener('reset', () => setTimeout(syncPpobOther, 0));
 
+  if (window.NxValidation) {
+    const accEl = document.getElementById('ppob-account');
+    const payEl = document.getElementById('ppob-pay-method');
+    NxValidation.bindPairGuard(form, [accEl, payEl], () => [accEl.value, payEl.value], payEl);
+  }
+
   guardSubmit(form, async () => {
     const dateVal = document.getElementById('ppob-date').value;
     const accountId = document.getElementById('ppob-account').value;
@@ -903,6 +909,11 @@ function setupPpobForm() {
 
     if (!accountId || !payMethod) {
       showNotification('Pilih aplikasi sumber dan rekening penerima!', 'error');
+      return;
+    }
+    const pairCheck = NxValidation.validateAccountPair(accountId, payMethod);
+    if (!pairCheck.ok) {
+      showNotification(pairCheck.message, 'error');
       return;
     }
     if (service === 'Lainnya' && !otherService) {
@@ -1227,267 +1238,7 @@ function updateRevenueChart() {
 // Rentang inklusif: >= 00:00:00 tanggal mulai dan < 00:00:00 hari setelah tanggal akhir
 // (setara sampai 23:59:59.999 tanggal akhir).
 // ------------------------------------------
-const TX_PRESET_LABELS = {
-  today: 'Hari ini', yesterday: 'Kemarin', last7: '7 hari terakhir', last30: '30 hari terakhir',
-  thisMonth: 'Bulan ini', lastMonth: 'Bulan lalu', custom: 'Tanggal sendiri'
-};
-// preset: 'all' | kunci di TX_PRESET_LABELS. rows === null berarti belum dimuat.
-const txFilter = { preset: 'all', customStart: null, customEndExcl: null, rows: null, loading: false, error: false };
-let txCustomOpen = false;
-let txFilterSeq = 0;
-
-function startOfLocalDay(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
-function addLocalDays(d, n) { return new Date(d.getFullYear(), d.getMonth(), d.getDate() + n, 0, 0, 0, 0); }
-
-function parseDateInput(value) {
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value || ''));
-  if (!m) return null;
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]), 0, 0, 0, 0);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-// Mengembalikan { start, endExcl } dalam waktu lokal. Preset dihitung ulang tiap query (aman saat lewat tengah malam).
-function getTxRange() {
-  const p = txFilter.preset;
-  if (p === 'all') return null;
-  if (p === 'custom') return { start: txFilter.customStart, endExcl: txFilter.customEndExcl };
-  const today = startOfLocalDay(new Date());
-  const y = today.getFullYear();
-  const m = today.getMonth();
-  switch (p) {
-    case 'today': return { start: today, endExcl: addLocalDays(today, 1) };
-    case 'yesterday': return { start: addLocalDays(today, -1), endExcl: today };
-    case 'last7': return { start: addLocalDays(today, -6), endExcl: addLocalDays(today, 1) };
-    case 'last30': return { start: addLocalDays(today, -29), endExcl: addLocalDays(today, 1) };
-    case 'thisMonth': return { start: new Date(y, m, 1), endExcl: new Date(y, m + 1, 1) };
-    case 'lastMonth': return { start: new Date(y, m - 1, 1), endExcl: new Date(y, m, 1) };
-    default: return null;
-  }
-}
-
-function formatTxDay(d) {
-  return d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-function txPeriodText(range) {
-  const last = addLocalDays(range.endExcl, -1);
-  return range.start.getTime() === last.getTime()
-    ? formatTxDay(range.start)
-    : `${formatTxDay(range.start)} - ${formatTxDay(last)}`;
-}
-
-// Ambil transaksi milik akun yang login pada rentang tanggal (bertahap per 1000 baris)
-async function fetchTransactionsInRange(start, endExcl) {
-  const size = 1000;
-  let from = 0;
-  let all = [];
-  for (;;) {
-    const { data, error } = await sb.from('transactions').select('*')
-      .eq('user_id', currentUserId)
-      .gte('date', start.toISOString())
-      .lt('date', endExcl.toISOString())
-      .order('date', { ascending: false })
-      .order('id', { ascending: false })
-      .range(from, from + size - 1);
-    if (error) return { data: null, error };
-    all = all.concat(data || []);
-    if (!data || data.length < size) break;
-    from += size;
-  }
-  return { data: all, error: null };
-}
-
-function renderTxFilterUi() {
-  document.querySelectorAll('#tx-filter-chips .tx-chip').forEach((chip) => {
-    const r = chip.dataset.range;
-    const on = r === 'custom' ? (txCustomOpen || txFilter.preset === 'custom') : r === txFilter.preset;
-    chip.classList.toggle('active', on);
-  });
-
-  const customEl = document.getElementById('tx-filter-custom');
-  if (customEl) customEl.hidden = !txCustomOpen;
-
-  const activeEl = document.getElementById('tx-filter-active');
-  const textEl = document.getElementById('tx-filter-active-text');
-  if (!activeEl || !textEl) return;
-  const range = getTxRange();
-  if (!range) {
-    activeEl.hidden = true;
-    textEl.textContent = '';
-  } else {
-    activeEl.hidden = false;
-    textEl.textContent = `Filter aktif: ${TX_PRESET_LABELS[txFilter.preset]} (${txPeriodText(range)})`;
-  }
-}
-
-async function runTxFilter() {
-  const range = getTxRange();
-  if (!range) {
-    txFilter.rows = null;
-    txFilter.loading = false;
-    txFilter.error = false;
-    renderTxFilterUi();
-    renderFullTransactionsList();
-    return;
-  }
-
-  const seq = ++txFilterSeq; // abaikan hasil query lama jika filter sudah berganti
-  txFilter.loading = true;
-  renderTxFilterUi();
-  renderFullTransactionsList();
-
-  try {
-    const { data, error } = await fetchTransactionsInRange(range.start, range.endExcl);
-    if (seq !== txFilterSeq) return;
-    if (error) throw error;
-    txFilter.rows = data || [];
-    txFilter.error = false;
-  } catch (err) {
-    if (seq !== txFilterSeq) return;
-    console.error('Gagal memfilter transaksi:', err);
-    txFilter.rows = [];
-    txFilter.error = true;
-    if (isAuthError(err)) {
-      showNotification('Sesi login berakhir. Silakan masuk kembali.', 'error');
-      setTimeout(handleLogout, 1500);
-    } else {
-      showNotification('Gagal memuat transaksi periode ini. Periksa koneksi lalu coba lagi.', 'error');
-    }
-  }
-  txFilter.loading = false;
-  renderTxFilterUi();
-  renderFullTransactionsList();
-}
-
-function selectTxRange(range) {
-  if (range === 'all') { resetTxFilter(); return; }
-
-  if (range === 'custom') {
-    txCustomOpen = true;
-    const startEl = document.getElementById('tx-filter-start');
-    const endEl = document.getElementById('tx-filter-end');
-    const todayKey = localDateKey(new Date());
-    if (startEl && !startEl.value) startEl.value = todayKey;
-    if (endEl && !endEl.value) endEl.value = todayKey;
-    renderTxFilterUi();
-    return;
-  }
-
-  if (!TX_PRESET_LABELS[range]) return;
-  txCustomOpen = false;
-  txFilter.preset = range;
-  txFilter.rows = null;
-  runTxFilter();
-}
-
-function applyCustomTxFilter() {
-  const startEl = document.getElementById('tx-filter-start');
-  const endEl = document.getElementById('tx-filter-end');
-  let start = parseDateInput(startEl && startEl.value);
-  let end = parseDateInput(endEl && endEl.value);
-
-  if (!start && !end) { showNotification('Pilih tanggal mulai atau tanggal akhir terlebih dahulu.', 'error'); return; }
-  // Satu tanggal saja = transaksi pada hari itu
-  if (!start) { start = end; startEl.value = endEl.value; }
-  if (!end) { end = start; endEl.value = startEl.value; }
-  if (start.getTime() > end.getTime()) { showNotification('Tanggal mulai tidak boleh setelah tanggal akhir.', 'error'); return; }
-
-  txFilter.preset = 'custom';
-  txFilter.customStart = start;
-  txFilter.customEndExcl = addLocalDays(end, 1);
-  txFilter.rows = null;
-  txCustomOpen = true;
-  runTxFilter();
-}
-
-function resetTxFilter() {
-  txFilterSeq++; // batalkan query yang masih berjalan
-  txFilter.preset = 'all';
-  txFilter.customStart = null;
-  txFilter.customEndExcl = null;
-  txFilter.rows = null;
-  txFilter.loading = false;
-  txFilter.error = false;
-  txCustomOpen = false;
-  const startEl = document.getElementById('tx-filter-start');
-  const endEl = document.getElementById('tx-filter-end');
-  if (startEl) startEl.value = '';
-  if (endEl) endEl.value = '';
-  renderTxFilterUi();
-  renderFullTransactionsList();
-}
-
-function loadTransactionsPage() {
-  renderTxFilterUi();
-  if (txFilter.preset === 'all') {
-    renderFullTransactionsList();
-  } else {
-    // Muat ulang dari database (mis. setelah hapus/tambah transaksi) agar hasil selalu terbaru
-    runTxFilter();
-  }
-}
-
-function renderFullTransactionsList() {
-  const tbodyEl = document.getElementById('full-tx-table-body');
-  const countEl = document.getElementById('tx-count-label');
-  if (!tbodyEl) return;
-
-  const filtered = txFilter.preset !== 'all';
-  if (filtered && txFilter.rows === null) {
-    if (countEl) countEl.textContent = 'Memuat data...';
-    tbodyEl.innerHTML = '<tr><td colspan="10" class="empty-state" style="text-align:center; padding:24px;">Memuat transaksi...</td></tr>';
-    return;
-  }
-
-  let list = [...(filtered ? txFilter.rows : appData.transactions)].sort((a, b) => new Date(b.date) - new Date(a.date));
-  if (txSearchTerm) {
-    list = list.filter((tx) =>
-      [tx.id, tx.notes, txTypeLabel(tx.type), tx.status]
-        .some((field) => String(field || '').toLowerCase().includes(txSearchTerm))
-    );
-  }
-
-  if (countEl) countEl.textContent = `Menampilkan total ${list.length} data`;
-
-  const checkAll = document.getElementById('tx-check-all');
-  if (checkAll) checkAll.checked = false;
-
-  if (list.length === 0) {
-    const emptyMsg = filtered
-      ? (txFilter.error ? 'Gagal memuat transaksi periode ini. Coba pilih filter lagi.' : 'Tidak ada transaksi pada periode ini')
-      : 'Belum ada transaksi tercatat.';
-    tbodyEl.innerHTML = `<tr><td colspan="10" class="empty-state" style="text-align:center; padding:24px;">${emptyMsg}</td></tr>`;
-    return;
-  }
-
-  tbodyEl.innerHTML = list.map((tx) => {
-    const acc = findAccount(tx.accountId);
-    const isDebt = tx.status === 'Hutang';
-    const cost = tx.cost_price !== null && tx.cost_price !== undefined ? tx.cost_price : tx.amount;
-    const safeId = escapeHtml(tx.id);
-    return `
-      <tr>
-        <td style="text-align:center;"><input type="checkbox" class="tx-checkbox" value="${safeId}"></td>
-        <td>
-          <strong style="color:#38bdf8; font-size:11px; display:block;">${escapeHtml(String(tx.id).toUpperCase())}</strong>
-          <span style="font-size:10px; color:var(--text-muted);">${escapeHtml(new Date(tx.date).toLocaleString('id-ID'))}</span>
-        </td>
-        <td>Owner</td>
-        <td>${escapeHtml(acc ? acc.name : '-')}</td>
-        <td>${escapeHtml(txTypeLabel(tx.type))}</td>
-        <td>${escapeHtml(tx.notes)}${isDebt ? ' <span class="badge-debt">Hutang</span>' : ''}</td>
-        <td style="text-align:right; font-weight:600; color:#34d399;">${formatRupiah(tx.admin_fee)}</td>
-        <td style="text-align:right; color:var(--text-muted);">${formatRupiah(cost)}</td>
-        <td style="text-align:right; font-weight:600; color:${Number(tx.profit) >= 0 ? '#34d399' : '#f87171'};">${formatRupiah(tx.profit)}</td>
-        <td>
-          <div class="tx-action-btns">
-            <button type="button" class="btn-receipt" onclick="printReceipts(['${safeId}'])" title="Cetak struk"><i class="fa-solid fa-print"></i></button>
-            <button type="button" class="btn-delete" onclick="deleteTransaction('${safeId}')" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>
-          </div>
-        </td>
-      </tr>`;
-  }).join('');
-}
+// (Filter tanggal, daftar, detail & edit Riwayat dipindah ke js/riwayat.js)
 
 // Hapus transaksi = batalkan efeknya (saldo dikembalikan, stok kembali, catatan hutang ikut dihapus)
 function deleteTransaction(txId) {
@@ -1632,7 +1383,9 @@ function exportTransactionsExcel(mode) {
       'Status': tx.status,
       'Penjualan': Number(tx.admin_fee || 0),
       'Modal': Number(tx.cost_price !== null && tx.cost_price !== undefined ? tx.cost_price : tx.amount || 0),
-      'Keuntungan': Number(tx.profit || 0)
+      'Keuntungan': Number(tx.profit || 0),
+      // Kolom tambahan Tarik Tunai (kosong untuk transaksi lain)
+      ...(typeof tarikTunaiExportFields === 'function' ? tarikTunaiExportFields(tx) : {})
     };
   });
 
@@ -1644,7 +1397,8 @@ function exportTransactionsExcel(mode) {
   });
 
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws['!cols'] = [{ wch: 26 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 40 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 }];
+  ws['!cols'] = [{ wch: 26 }, { wch: 20 }, { wch: 12 }, { wch: 16 }, { wch: 40 }, { wch: 10 }, { wch: 14 }, { wch: 14 }, { wch: 14 },
+    { wch: 20 }, { wch: 13 }, { wch: 18 }, { wch: 12 }, { wch: 15 }, { wch: 15 }];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, mode === 'daily' ? 'Harian' : 'Bulanan');
   const fileName = mode === 'daily' ? `Nexora_Harian_${todayKey}.xlsx` : `Nexora_Bulanan_${monthKey}.xlsx`;

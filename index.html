@@ -16,7 +16,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="Nexora">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <script src="js/pwa.js" defer></script>
+  <script src="js/pwa.js?v=2.6" defer></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -26,11 +26,11 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
   <!-- Client Supabase tunggal (dibuat di js/supabase.js) -->
-  <script src="js/supabase.js"></script>
+  <script src="js/supabase.js?v=2.6"></script>
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=2.6">
 </head>
 <body class="auth-pending">
 
@@ -273,6 +273,56 @@
                   <option value="Topup Gopay">Topup Gopay</option>
                   <option value="Topup Linkaja">Topup Linkaja</option>
                 </select>
+              </div>
+
+              <!-- TARIK TUNAI (Admin Luar / Admin Dalam) - tampil hanya jika layanan = Tarik Tunai, diatur js/tarik-tunai.js -->
+              <div id="tt-section" style="display: none; flex-direction: column; gap: 16px;">
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label><i class="fa-solid fa-mobile-screen"></i> Aplikasi / Rekening Pengirim Pelanggan</label>
+                  <input type="text" id="tt-sender" class="glass-input" placeholder="Contoh: DANA, BRI, ShopeePay..." autocomplete="off">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label><i class="fa-solid fa-building-columns"></i> Rekening / Aplikasi Penerima (Milik Agen)</label>
+                  <select id="tt-receiver" class="glass-input">
+                    <option value="">-- Pilih Rekening Penerima --</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label><i class="fa-solid fa-cash-register"></i> Kas Fisik (Sumber Uang Tunai)</label>
+                  <select id="tt-cash" class="glass-input">
+                    <option value="">-- Pilih Kas Fisik --</option>
+                  </select>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label><i class="fa-solid fa-money-bill-wave"></i> Nominal Tarik Tunai (Rp)</label>
+                  <input type="text" inputmode="numeric" id="tt-nominal" class="glass-input" placeholder="Contoh: 500.000">
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label><i class="fa-solid fa-tags"></i> Jenis Admin</label>
+                  <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 10px 12px; border: 1px solid var(--glass-border); border-radius: var(--radius-md);">
+                      <input type="radio" name="tt-admin-type" value="luar" style="margin-top: 3px;">
+                      <span><strong>Admin Luar</strong><br><small style="color: var(--text-muted);">Pelanggan kirim saldo sebesar nominal. Admin dipotong dari uang tunai yang diberikan.</small></span>
+                    </label>
+                    <label style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer; padding: 10px 12px; border: 1px solid var(--glass-border); border-radius: var(--radius-md);">
+                      <input type="radio" name="tt-admin-type" value="dalam" style="margin-top: 3px;">
+                      <span><strong>Admin Dalam</strong><br><small style="color: var(--text-muted);">Pelanggan kirim saldo sebesar nominal + admin. Uang tunai yang diberikan sesuai nominal.</small></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom: 0;">
+                  <label><i class="fa-solid fa-receipt"></i> Biaya Admin (Rp)</label>
+                  <input type="text" inputmode="numeric" id="tt-admin" class="glass-input" placeholder="Contoh: 3.000">
+                </div>
+
+                <div id="tt-calc" class="fm-info" style="margin-bottom: 0;"></div>
+                <div id="tt-result" class="fm-info" style="display: none; margin-bottom: 0; line-height: 1.7;"></div>
+                <div id="tt-error" style="display: none; color: #f87171; font-size: 12px;" role="alert"></div>
               </div>
 
               <div class="form-group" style="margin-bottom: 0;">
@@ -530,18 +580,18 @@
             </button>
           </div>
 
-          <!-- FILTER TANGGAL RIWAYAT -->
+          <!-- FILTER TANGGAL RIWAYAT (default: Hari ini, WIB) -->
           <div class="glass-card tx-filter-card" id="tx-filter-card">
             <div class="tx-filter-title"><i class="fa-solid fa-filter"></i> Filter Tanggal</div>
             <div class="tx-filter-chips" id="tx-filter-chips">
-              <button type="button" class="tx-chip active" data-range="all">Semua</button>
-              <button type="button" class="tx-chip" data-range="today">Hari ini</button>
+              <button type="button" class="tx-chip active" data-range="today">Hari Ini</button>
               <button type="button" class="tx-chip" data-range="yesterday">Kemarin</button>
-              <button type="button" class="tx-chip" data-range="last7">7 hari terakhir</button>
-              <button type="button" class="tx-chip" data-range="last30">30 hari terakhir</button>
+              <button type="button" class="tx-chip" data-range="last7">7 Hari Terakhir</button>
+              <button type="button" class="tx-chip" data-range="last30">30 Hari Terakhir</button>
+              <button type="button" class="tx-chip" data-range="all">Semua</button>
               <button type="button" class="tx-chip" data-range="thisMonth">Bulan ini</button>
               <button type="button" class="tx-chip" data-range="lastMonth">Bulan lalu</button>
-              <button type="button" class="tx-chip" data-range="custom"><i class="fa-solid fa-calendar-days"></i> Pilih tanggal sendiri</button>
+              <button type="button" class="tx-chip" data-range="custom"><i class="fa-solid fa-calendar-days"></i> Pilih tanggal</button>
             </div>
 
             <div class="tx-filter-custom" id="tx-filter-custom" hidden>
@@ -564,8 +614,25 @@
 
             <div class="tx-filter-active" id="tx-filter-active" hidden>
               <span class="tx-filter-active-text" id="tx-filter-active-text"></span>
-              <button type="button" class="tx-filter-clear" id="btn-tx-filter-clear" title="Hapus filter"><i class="fa-solid fa-xmark"></i> Reset</button>
+              <button type="button" class="tx-filter-clear" id="btn-tx-filter-clear" title="Kembali ke hari ini"><i class="fa-solid fa-xmark"></i> Hari ini</button>
             </div>
+          </div>
+
+          <!-- PENCARIAN + FILTER JENIS & STATUS -->
+          <div class="glass-card tx-search-card">
+            <input type="text" id="search-tx-input" class="glass-input" placeholder="Cari nama pelanggan, ID, atau keterangan..." autocomplete="off">
+            <div class="tx-filter-chips tx-type-chips" id="tx-type-chips">
+              <button type="button" class="tx-chip active" data-type="all">Semua</button>
+              <button type="button" class="tx-chip" data-type="tarik">Tarik Tunai</button>
+              <button type="button" class="tx-chip" data-type="setor">Setor Tunai</button>
+              <button type="button" class="tx-chip" data-type="pindah">Pindah Saldo</button>
+              <button type="button" class="tx-chip" data-type="ppob">PPOB</button>
+              <button type="button" class="tx-chip" data-type="kasir">Kasir</button>
+              <button type="button" class="tx-chip" data-type="layanan">Layanan Lain</button>
+            </div>
+            <select id="tx-status-filter" class="glass-input" aria-label="Filter status">
+              <option value="all">Semua Status</option>
+            </select>
           </div>
 
           <!-- Tombol Cetak Struk Gabungan & Info Total Data -->
@@ -574,11 +641,6 @@
               <i class="fa-solid fa-print"></i> Cetak Struk Gabungan
             </button>
             <span style="font-size: 12px; color: var(--text-muted);" id="tx-count-label">Menampilkan total 0 data</span>
-          </div>
-
-          <!-- Input Pencarian -->
-          <div class="glass-card" style="padding: 12px; margin-bottom: 14px;">
-            <input type="text" id="search-tx-input" class="glass-input" placeholder="Cari ID, layanan, atau keterangan...">
           </div>
 
           <!-- Tombol Export Excel -->
@@ -614,14 +676,13 @@
                     <th style="text-align: center;">AKSI</th>
                   </tr>
                 </thead>
-                <tbody id="full-tx-table-body">
-                  <tr>
-                    <td colspan="10" class="empty-state">Belum ada transaksi tercatat.</td>
-                  </tr>
+                <tbody id="tx-list">
+                  <tr><td colspan="10" class="empty-state">Memuat transaksi...</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
+          <button type="button" class="btn-primary tx-more" id="btn-tx-more" hidden>Tampilkan lebih banyak</button>
         </section>
 
         <!-- PAGE: BALANCES -->
@@ -821,6 +882,7 @@
                 <label><i class="fa-solid fa-note-sticky"></i> Catatan (Opsional)</label>
                 <input type="text" id="tf-notes" class="glass-input" placeholder="Contoh: Top up DANA">
               </div>
+              <div id="tf-same-warning" style="display:none; color:#f87171; font-size:12px;" role="alert">Aplikasi pengirim dan penerima tidak boleh sama.</div>
               <div id="tf-preview" class="fm-info" style="display:none; margin-bottom:0;"></div>
               <button type="submit" class="btn-primary" style="justify-content: center; padding: 12px;">
                 <i class="fa-solid fa-circle-check"></i> Pindahkan Saldo
@@ -995,11 +1057,14 @@
   </div>
 
   
-  <script src="js/config.js"></script>
-  <script src="js/app.js"></script>
-  <script src="js/features.js"></script>
-  <script src="js/kasir.js"></script>
-  <script src="js/select-picker.js"></script>
-  <script src="js/ledger.js"></script>
+  <script src="js/config.js?v=2.6"></script>
+  <script src="js/validation.js?v=2.6"></script>
+  <script src="js/app.js?v=2.6"></script>
+  <script src="js/features.js?v=2.6"></script>
+  <script src="js/tarik-tunai.js?v=2.6"></script>
+  <script src="js/kasir.js?v=2.6"></script>
+  <script src="js/select-picker.js?v=2.6"></script>
+  <script src="js/ledger.js?v=2.6"></script>
+  <script src="js/riwayat.js?v=2.6"></script>
 </body>
 </html>

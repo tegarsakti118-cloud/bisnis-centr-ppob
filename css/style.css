@@ -1443,3 +1443,71 @@ body.pk-lock { overflow: hidden; }
   display: none !important;
 }
 
+/* ==========================================
+NEXORA - OVERRIDE WARNING BADGE MODERN
+========================================== */
+​/* 1. Target Elemen Peringatan di Form Tarik/Setor & Pindah Saldo /
+#ts-same-warning,
+#tf-same-warning,
+.nx-field-warning,
+.same-app-error,
+.same-app-warning-box,
+.input-group + div:has(> span),
+/ Tangkap pesan peringatan berdasarkan teksnya /
+div[id="warning"],
+p[id*="warning"] {
+display: flex !important;
+align-items: center !important;
+gap: 12px !important;
+margin: 12px 0 16px 0 !important;
+padding: 12px 16px !important;
+background: linear-gradient(135deg, rgba(248, 113, 113, 0.18) 0%, rgba(225, 29, 72, 0.12) 100%) !important;
+border: 1px solid rgba(248, 113, 113, 0.45) !important;
+border-left: 4px solid #f87171 !important;
+border-radius: 12px !important;
+color: #fca5a5 !important;
+font-size: 13px !important;
+font-weight: 500 !important;
+line-height: 1.4 !important;
+box-shadow: 0 8px 24px rgba(248, 113, 113, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
+backdrop-filter: blur(12px) !important;
+-webkit-backdrop-filter: blur(12px) !important;
+animation: nxWarningSlideIn 0.3s ease-out forwards !important;
+}
+​/* 2. Sembunyikan elemen jika sedang tidak aktif / disembunyikan JS /
+#ts-same-warning[style="display: none"],
+#tf-same-warning[style*="display: none"],
+.nx-field-warning[style*="display: none"] {
+display: none !important;
+}
+​/* 3. Tambahkan Ikon Seruan Merah Otomatis */
+#ts-same-warning::before,
+#tf-same-warning::before,
+.nx-field-warning::before,
+.same-app-error::before {
+content: "\f06a" !important;
+font-family: "Font Awesome 6 Free" !important;
+font-weight: 900 !important;
+font-size: 16px !important;
+color: #f87171 !important;
+flex-shrink: 0 !important;
+}
+​/* 4. Highlight Border Menyala pada Select Box yang Bentrok */
+select.input-invalid,
+.input-wrapper:has(select.input-invalid),
+div.input-group:has(select.input-invalid) {
+border-color: #f87171 !important;
+box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.25) !important;
+border-radius: 8px !important;
+}
+​/* 5. Animasi Muncul Halus (Sintaks Bersih Anti-Error) */
+@keyframes nxWarningSlideIn {
+0% {
+opacity: 0;
+transform: translateY(-6px) scale(0.98);
+}
+100% {
+opacity: 1;
+transform: translateY(0) scale(1);
+}
+}

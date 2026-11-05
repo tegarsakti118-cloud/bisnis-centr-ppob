@@ -10,7 +10,7 @@
 //
 // Mengubah daftar file di SHELL? Naikkan VERSION agar cache lama dibersihkan.
 // ==========================================
-const VERSION = 'nexora-v4';
+const VERSION = 'nexora-v9';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -26,11 +26,14 @@ const SHELL = [
   'js/supabase.js',
   'js/auth-ui.js',
   'js/config.js',
+  'js/validation.js',
   'js/app.js',
   'js/features.js',
+  'js/tarik-tunai.js',
   'js/kasir.js',
   'js/select-picker.js',
   'js/ledger.js',
+  'js/riwayat.js',
   'js/pwa.js',
   'img/nexora-logo.png',
   'img/favicon.ico',
@@ -65,7 +68,7 @@ self.addEventListener('activate', (event) => {
 async function networkFirst(request) {
   const cache = await caches.open(SHELL_CACHE);
   try {
-    const response = await fetch(request);
+    const response = await fetch(request, { cache: 'no-store' });  // lewati cache HTTP browser
     if (response && response.status === 200) cache.put(request, response.clone());
     return response;
   } catch (err) {

@@ -20,6 +20,7 @@
     voucher: 'Penjualan Kasir',
     transaksi: 'Transaksi',
     hapus_transaksi: 'Transaksi dihapus (dikembalikan)',
+    edit_transaksi: 'Transaksi diedit (saldo dikoreksi)',
     bayar_hutang: 'Pembayaran hutang',
     pengeluaran: 'Pengeluaran',
     prive: 'Prive (ambil pribadi)',

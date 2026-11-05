@@ -206,9 +206,34 @@
       </div>`).join('');
   }
 
+  // Aplikasi pengirim TIDAK BOLEH sama dengan penerima. Dicek langsung saat memilih aplikasi:
+  // tampilkan pesan + matikan tombol simpan. (Server juga menolak: sql/nexora_update_transfer_tarik_tunai.sql)
+  // Memakai fungsi validasi bersama (js/validation.js) supaya konsisten dengan Tarik/Setor & PPOB
+  const SAME_APP_MESSAGE = (window.NxValidation && NxValidation.SAME_APP_MESSAGE) || 'Aplikasi pengirim dan penerima tidak boleh sama.';
+
+  function isSameTransferPair(fromId, toId) {
+    if (window.NxValidation) return !NxValidation.validateAccountPair(fromId, toId).ok;
+    return !!fromId && !!toId && String(fromId) === String(toId);
+  }
+
+  function syncTransferPairValidation() {
+    const fromEl = $('tf-from');
+    const toEl = $('tf-to');
+    if (!fromEl || !toEl) return false;
+    const same = isSameTransferPair(fromEl.value, toEl.value);
+    const warn = $('tf-same-warning');
+    if (warn) warn.style.display = same ? 'block' : 'none';
+    const form = $('transfer-form');
+    const btn = form && form.querySelector('button[type="submit"]');
+    if (btn) btn.disabled = same;
+    return same;
+  }
+
   function updateTransferPreview() {
+    const same = syncTransferPairValidation();
     const box = $('tf-preview');
     if (!box) return;
+    if (same) { box.style.display = 'none'; return; }
     const from = findAccount($('tf-from').value);
     const to = findAccount($('tf-to').value);
     const amount = getCleanNumber($('tf-amount'));
@@ -234,6 +259,15 @@
     ['tf-amount', 'tf-fee'].forEach((id) => $(id).addEventListener('input', updateTransferPreview));
 
     guardSubmit(form, async () => {
+      try {
+        await submitTransfer();
+      } finally {
+        // guardSubmit mengaktifkan lagi tombol setelah selesai; jalankan ulang validasi sesudahnya
+        setTimeout(syncTransferPairValidation, 0);
+      }
+    });
+
+    async function submitTransfer() {
       const from = findAccount($('tf-from').value);
       const to = findAccount($('tf-to').value);
       const amount = getCleanNumber($('tf-amount'));
@@ -241,7 +275,8 @@
       const notes = $('tf-notes').value.trim();
 
       if (!from || !to) return showNotification('Pilih rekening asal dan tujuan!', 'error');
-      if (String(from.id) === String(to.id)) return showNotification('Rekening asal dan tujuan tidak boleh sama!', 'error');
+      if (isSameTransferPair(from.id, to.id)) return showNotification(SAME_APP_MESSAGE, 'error');
+      if (fee < 0) return showNotification('Biaya admin tidak boleh negatif!', 'error');
       if (amount <= 0) return showNotification('Nominal harus lebih dari 0!', 'error');
       if (num(from.balance) < amount + fee) {
         return showNotification(`Saldo ${from.name} tidak cukup (butuh ${rp(amount + fee)}, tersedia ${rp(from.balance)}).`, 'error');
@@ -263,7 +298,7 @@
       setDefaultDateTime($('tf-date'));
       refreshAllViews();
       showNotification('Saldo berhasil dipindahkan!', 'success');
-    });
+    }
 
     $('transfer-list').addEventListener('click', (e) => {
       const edit = e.target.closest('[data-tf-edit]');
@@ -290,7 +325,7 @@
       ],
       onSubmit: async (v) => {
         if (!findAccount(v.from) || !findAccount(v.to)) { showNotification('Pilih rekening yang valid!', 'error'); return false; }
-        if (v.from === v.to) { showNotification('Rekening asal dan tujuan tidak boleh sama!', 'error'); return false; }
+        if (isSameTransferPair(v.from, v.to)) { showNotification(SAME_APP_MESSAGE, 'error'); return false; }
         const ok = await callRpc('update_balance_transfer', {
           p_id: String(t.id), p_from: v.from, p_to: v.to, p_amount: v.amount, p_fee: v.fee,
           p_date: toIso(v.date), p_notes: v.notes
@@ -869,6 +904,9 @@
 
   window.fetchFeatureTables = fetchFeatureTables;
   window.featureTotals = featureTotals;
+  // Dipakai menu Riwayat (js/riwayat.js) agar Pindah Saldo bisa diedit/dihapus dari sana
+  window.openEditTransfer = openEditTransfer;
+  window.deleteTransfer = deleteTransfer;
 
   document.addEventListener('DOMContentLoaded', () => {
     setupTransferForm();
