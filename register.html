@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Daftar - Nexora</title>
+  <title>Daftar Pemilik - Nexora</title>
   <!-- Favicon & ikon aplikasi -->
   <link rel="icon" type="image/x-icon" href="img/favicon.ico">
   <link rel="icon" type="image/png" sizes="32x32" href="img/favicon-32.png">
@@ -25,6 +25,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase.js"></script>
   <script src="js/auth-ui.js"></script>
+  <script src="js/role-guard.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; }
@@ -54,10 +55,24 @@
   <div class="login-card">
     <div class="brand-header">
       <img class="auth-logo" src="img/nexora-logo.png" alt="Logo Nexora" width="93" height="64" onerror="this.hidden=true;">
-      <h2>Daftar Akun</h2>
-      <p>Buat akun Nexora baru</p>
+      <h2>Daftar Pemilik</h2>
+      <p>Buat akun pemilik bisnis Nexora. Perlu kode aktivasi.</p>
     </div>
 
+    <div class="input-group">
+      <label>Nama Lengkap</label>
+      <div class="input-wrapper">
+        <i class="fa-solid fa-user"></i>
+        <input type="text" id="reg-name" placeholder="Nama Anda" autocomplete="name" />
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Nama Bisnis</label>
+      <div class="input-wrapper">
+        <i class="fa-solid fa-store"></i>
+        <input type="text" id="reg-business" placeholder="Contoh: Saka Pay" autocomplete="organization" />
+      </div>
+    </div>
     <div class="input-group">
       <label>Email</label>
       <div class="input-wrapper">
@@ -65,20 +80,32 @@
         <input type="email" id="reg-email" placeholder="nama@email.com" autocomplete="email" />
       </div>
     </div>
-
     <div class="input-group">
-      <label>Password (minimal 6 karakter)</label>
+      <label>Username</label>
+      <div class="input-wrapper">
+        <i class="fa-solid fa-at"></i>
+        <input type="text" id="reg-username" placeholder="huruf kecil, angka, titik, _" autocomplete="username" autocapitalize="none" />
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Password (minimal 8 karakter)</label>
       <div class="input-wrapper">
         <i class="fa-solid fa-lock"></i>
         <input type="password" id="reg-password" placeholder="••••••••" autocomplete="new-password" />
       </div>
     </div>
-
     <div class="input-group">
       <label>Ulangi Password</label>
       <div class="input-wrapper">
         <i class="fa-solid fa-lock"></i>
         <input type="password" id="reg-password2" placeholder="••••••••" autocomplete="new-password" />
+      </div>
+    </div>
+    <div class="input-group">
+      <label>Kode Aktivasi</label>
+      <div class="input-wrapper">
+        <i class="fa-solid fa-key"></i>
+        <input type="text" id="reg-code" placeholder="Kode dari Nexora" autocomplete="off" autocapitalize="characters" />
       </div>
     </div>
 
@@ -95,8 +122,6 @@
 
   <script>
     const sbAuth = window.supabaseClient;
-    const INDEX_URL = new URL('index.html', window.location.href).href;
-    const LOGIN_URL = new URL('login.html', window.location.href).href;
 
     function setBusy(isBusy) {
       document.querySelectorAll('.btn').forEach(b => { b.disabled = isBusy; b.style.opacity = isBusy ? '0.6' : '1'; });
@@ -110,41 +135,67 @@
       }
       try {
         const { data, error } = await sbAuth.auth.getSession();
-        if (!error && data.session && data.session.user) window.location.replace(INDEX_URL);
+        if (!error && data.session && data.session.user) window.location.replace(new URL('login.html', window.location.href).href);
       } catch (err) {
         console.error('Gagal memeriksa sesi:', err);
       }
     });
 
-    ['reg-email', 'reg-password', 'reg-password2'].forEach(id => {
+    ['reg-name', 'reg-business', 'reg-email', 'reg-username', 'reg-password', 'reg-password2', 'reg-code'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', (e) => {
         if (e.key === 'Enter') processRegister();
       });
     });
 
-    async function processRegister() {
-      const email = document.getElementById('reg-email').value.trim();
-      const password = document.getElementById('reg-password').value;
-      const password2 = document.getElementById('reg-password2').value;
+    // Pesan error dari Edge Function (respon non-2xx)
+    async function functionError(error) {
+      try {
+        if (error && error.context && typeof error.context.json === 'function') {
+          const body = await error.context.json();
+          if (body && body.error) return body.error;
+        }
+      } catch (e) { /* abaikan */ }
+      return authMessage(error);
+    }
 
-      if (!email || !password || !password2) return notify('Semua kolom wajib diisi.', 'warning');
-      if (password.length < 6) return notify('Password minimal 6 karakter.', 'warning');
+    async function processRegister() {
+      const v = id => document.getElementById(id).value;
+      const full_name = v('reg-name').trim();
+      const business_name = v('reg-business').trim();
+      const email = v('reg-email').trim();
+      const username = v('reg-username').trim().toLowerCase();
+      const password = v('reg-password');
+      const password2 = v('reg-password2');
+      const invite_code = v('reg-code').trim();
+
+      if (!full_name || !business_name || !email || !username || !password || !password2 || !invite_code) {
+        return notify('Semua kolom wajib diisi.', 'warning');
+      }
+      if (!/^[a-z0-9_.]{3,30}$/.test(username)) return notify('Username 3-30 karakter: huruf kecil, angka, titik, atau garis bawah.', 'warning');
+      if (password.length < 8) return notify('Password minimal 8 karakter.', 'warning');
       if (password !== password2) return notify('Password dan ulangi password tidak sama.', 'warning');
 
       setBusy(true);
       try {
-        const { data, error } = await sbAuth.auth.signUp({ email, password });
+        // Role TIDAK dikirim dari sini: server yang menetapkan Super Admin setelah kode aktivasi valid.
+        const { error } = await sbAuth.functions.invoke('register-owner', {
+          body: { full_name, business_name, email, username, password, invite_code }
+        });
         if (error) {
-          notify(authMessage(error), 'error');
-        } else if (data.session) {
-          // Konfirmasi email dimatikan di Supabase: langsung masuk
-          window.location.replace(INDEX_URL);
-          return;
-        } else {
-          await notify('Pendaftaran berhasil! Cek email Anda untuk konfirmasi, lalu masuk.', 'success', 3200);
-          window.location.replace(LOGIN_URL);
+          notify(await functionError(error), 'error', 6000);
+          setBusy(false);
           return;
         }
+        const login = await sbAuth.auth.signInWithPassword({ email, password });
+        if (login.error) {
+          await notify('Pendaftaran berhasil. Silakan masuk.', 'success', 2500);
+          window.location.replace(new URL('login.html', window.location.href).href);
+          return;
+        }
+        try { await sbAuth.rpc('nx_log_auth_event', { p_type: 'LOGIN' }); } catch (e) { /* abaikan */ }
+        await notify('Pendaftaran berhasil!', 'success', 1500);
+        window.location.replace(new URL('admin.html', window.location.href).href);
+        return;
       } catch (err) {
         notify(authMessage(err), 'error');
       }

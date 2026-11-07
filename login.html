@@ -25,6 +25,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase.js"></script>
   <script src="js/auth-ui.js"></script>
+  <script src="js/role-guard.js"></script>
 
   <style>
     * { box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; margin: 0; padding: 0; }
@@ -80,7 +81,7 @@
 
     <div class="card-footer">
       <a href="forgot.html">Lupa password?</a>
-      <a href="register.html">Daftar Akun</a>
+      <a href="register.html">Daftar Pemilik</a>
     </div>
 
     <div class="version-text">Nexora Business Center (Cloud)</div>
@@ -90,6 +91,30 @@
     const sbAuth = window.supabaseClient;
     // Alamat index.html relatif terhadap halaman ini (aman walau di-hosting di subfolder)
     const INDEX_URL = new URL('index.html', window.location.href).href;
+
+    // Role dibaca dari database (bukan localStorage), lalu diarahkan ke halaman yang sesuai.
+    // Akun nonaktif / cabang nonaktif / tanpa role ditolak dan sesinya dicabut.
+    async function routeAfterAuth(isFreshLogin) {
+      let me;
+      try {
+        me = await NexoraAuth.whoami(sbAuth);
+      } catch (err) {
+        console.error('Gagal memverifikasi akun:', err);
+        notify('Tidak dapat memverifikasi akun. Periksa koneksi lalu coba lagi.', 'error', 6000);
+        setBusy(false);
+        return;
+      }
+      if (!me || !me.allowed) {
+        await sbAuth.auth.signOut();
+        notify(NexoraAuth.blockMessage(me && me.reason), 'error', 6000);
+        setBusy(false);
+        return;
+      }
+      if (isFreshLogin) {
+        try { await sbAuth.rpc('nx_log_auth_event', { p_type: 'LOGIN' }); } catch (e) { /* log gagal tidak menghalangi masuk */ }
+      }
+      window.location.replace(new URL(NexoraAuth.homeFor(me), window.location.href).href);
+    }
 
     function setBusy(isBusy) {
       document.querySelectorAll('.btn').forEach(b => { b.disabled = isBusy; b.style.opacity = isBusy ? '0.6' : '1'; });
@@ -105,11 +130,15 @@
       try {
         const { data, error } = await sbAuth.auth.getSession();
         if (!error && data.session && data.session.user) {
-          window.location.replace(INDEX_URL);
+          await routeAfterAuth(false);
         }
       } catch (err) {
         console.error('Gagal memeriksa sesi:', err);
       }
+      try {
+        const m = sessionStorage.getItem('nx_login_msg');
+        if (m) { sessionStorage.removeItem('nx_login_msg'); notify(m, 'error', 6000); }
+      } catch (e) { /* abaikan */ }
     });
 
     // Tekan Enter di kolom email/password = Masuk
@@ -132,7 +161,7 @@
           setBusy(false);
           return;
         }
-        window.location.replace(INDEX_URL);
+        await routeAfterAuth(true);
       } catch (err) {
         notify(authMessage(err), 'error');
         setBusy(false);

@@ -1,0 +1,930 @@
+
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard Utama Super Admin - Nexora Business Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth-ui.js"></script>
+  <script src="js/role-guard.js"></script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0d1117; color: #e6edf3; }
+    .glass-card { background: #161b22; border: 1px solid #30363d; border-radius: 16px; }
+    .glass-input { background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 8px; padding: 10px 14px; outline: none; }
+    .glass-input:focus { border-color: #17A897; }
+    .sidebar-item.active { background: #17A897; color: #ffffff; font-weight: 600; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col md:flex-row">
+
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="w-full md:w-64 bg-[#161b22] border-r border-[#30363d] p-4 flex flex-col justify-between shrink-0">
+    <div>
+      <div class="flex items-center gap-3 px-3 py-4 mb-4 border-b border-[#30363d]">
+        <img src="img/nexora-logo.png" alt="Nexora Logo" class="h-8 w-auto" onerror="this.src='https://via.placeholder.com/32?text=N';">
+        <div>
+          <h1 class="text-base font-bold text-white leading-none">Nexora HQ</h1>
+          <span class="text-xs text-[#17A897] font-semibold">Super Admin Panel</span>
+        </div>
+      </div>
+      <nav class="space-y-1">
+        <button onclick="switchAdminTab('overview')" id="nav-overview" class="sidebar-item active w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-chart-line text-sm"></i> Executive Summary
+        </button>
+        <button onclick="switchAdminTab('branches')" id="nav-branches" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-store text-sm"></i> Manajemen Cabang
+        </button>
+        <button onclick="switchAdminTab('permissions')" id="nav-permissions" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-toggle-on text-sm"></i> Hak Akses & Fitur
+        </button>
+        <button onclick="switchAdminTab('balances')" id="nav-balances" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-vault text-sm"></i> Kontrol Saldo HQ
+        </button>
+        <button onclick="switchAdminTab('users')" id="nav-users" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-users-gear text-sm"></i> Akun & Karyawan
+        </button>
+        <button onclick="switchAdminTab('monitoring')" id="nav-monitoring" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-receipt text-sm"></i> Monitoring Transaksi
+        </button>
+        <button onclick="switchAdminTab('audit')" id="nav-audit" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-shield-halved text-sm"></i> Audit Log System
+        </button>
+      </nav>
+    </div>
+    <div class="pt-4 border-t border-[#30363d]">
+      <div class="px-3 mb-3">
+        <p class="text-xs font-semibold text-white" id="admin-user-name">Super Admin</p>
+        <p class="text-[10px] text-[#8b949e]" id="admin-user-email">admin@nexora.cloud</p>
+      </div>
+      <a href="index.html" class="w-full flex items-center justify-center gap-2 px-4 py-2 mb-2 bg-[#17A897]/10 text-[#17A897] border border-[#17A897]/30 rounded-xl text-xs hover:bg-[#17A897]/20 transition">
+        <i class="fa-solid fa-cash-register"></i> Buka Aplikasi Kasir
+      </a>
+      <button onclick="handleLogout()" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-500/10 text-red-400 border border-red-500/20 rounded-xl text-xs hover:bg-red-500/20 transition">
+        <i class="fa-solid fa-right-from-bracket"></i> Keluar System
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN CONTENT AREA -->
+  <main class="flex-1 p-6 overflow-y-auto">
+
+    <!-- TAB 1: EXECUTIVE SUMMARY -->
+    <section id="tab-overview" class="space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white">Ringkasan Eksekutif HQ</h2>
+          <p class="text-xs text-[#8b949e]">Pantau performa seluruh cabang Nexora dalam satu tampilan.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <select id="filter-branch-overview" onchange="loadDashboardMetrics()" class="glass-input text-xs">
+            <option value="all">Semua Cabang HQ</option>
+          </select>
+          <button onclick="loadDashboardMetrics()" class="px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold hover:opacity-90">
+            <i class="fa-solid fa-rotate"></i> Refresh
+          </button>
+        </div>
+      </div>
+
+      <!-- METRIC CARDS -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="glass-card p-4">
+          <span class="text-xs text-[#8b949e]">Total Cabang</span>
+          <h3 class="text-xl font-bold text-white mt-1" id="metric-total-branches">0</h3>
+          <span class="text-[10px] text-emerald-400 font-semibold" id="metric-active-branches">0 Aktif</span>
+        </div>
+        <div class="glass-card p-4">
+          <span class="text-xs text-[#8b949e]">Total Saldo Aplikasi</span>
+          <h3 class="text-xl font-bold text-[#17A897] mt-1" id="metric-total-app-balance">Rp 0</h3>
+          <span class="text-[10px] text-[#8b949e]" id="cap-app">Seluruh Cabang</span>
+        </div>
+        <div class="glass-card p-4">
+          <span class="text-xs text-[#8b949e]">Total Kas Fisik</span>
+          <h3 class="text-xl font-bold text-sky-400 mt-1" id="metric-total-cash">Rp 0</h3>
+          <span class="text-[10px] text-[#8b949e]" id="cap-cash">Seluruh Cabang</span>
+        </div>
+        <div class="glass-card p-4">
+          <span class="text-xs text-[#8b949e]">Omzet Hari Ini</span>
+          <h3 class="text-xl font-bold text-amber-400 mt-1" id="metric-today-omzet">Rp 0</h3>
+          <span class="text-[10px] text-emerald-400 font-semibold" id="metric-today-profit">Untung: Rp 0</span>
+        </div>
+      </div>
+
+      <!-- GRAPH & LOGS -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="glass-card p-5 md:col-span-2 flex flex-col justify-between">
+          <h4 class="text-sm font-bold text-white mb-4">Performa Omzet Antar Cabang</h4>
+          <div class="h-64 relative">
+            <canvas id="chartBranchPerformance"></canvas>
+          </div>
+        </div>
+        <div class="glass-card p-5">
+          <h4 class="text-sm font-bold text-white mb-4">Aktivitas Terkini</h4>
+          <div id="recent-hq-activities" class="space-y-3 text-xs overflow-y-auto max-h-64">
+            <p class="text-[#8b949e]">Memuat aktivitas...</p>
+          </div>
+        </div>
+      </div>
+    
+      <!-- DASHBOARD V2: data dari fungsi server nx_dashboard_stats -->
+      <div class="flex items-center gap-2">
+        <span class="text-xs text-[#8b949e]">Periode:</span>
+        <select id="dash-range" onchange="loadDashboardMetrics()" class="glass-input text-xs">
+          <option value="today">Hari ini</option><option value="7">7 hari terakhir</option><option value="30">30 hari terakhir</option>
+        </select>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Cabang Nonaktif</span><h3 class="text-xl font-bold text-red-400 mt-1" id="dash-inactive">0</h3></div>
+        <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Total Karyawan</span><h3 class="text-xl font-bold text-white mt-1" id="dash-employees">0</h3></div>
+        <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Total Transaksi</span><h3 class="text-xl font-bold text-white mt-1" id="dash-tx">0</h3></div>
+        <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Berhasil</span><h3 class="text-xl font-bold text-emerald-400 mt-1" id="dash-ok">0</h3></div>
+        <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Pending / Hutang</span><h3 class="text-xl font-bold text-amber-400 mt-1" id="dash-pending">0</h3></div>
+        <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Gagal</span><h3 class="text-xl font-bold text-red-400 mt-1" id="dash-failed">0</h3></div>
+      </div>
+      <div class="glass-card p-4"><h3 class="text-xs font-semibold text-white mb-2">Omzet &amp; Keuntungan Harian</h3><div style="height:220px"><canvas id="dashDaily"></canvas></div></div>
+      <div class="glass-card p-4"><h3 class="text-xs font-semibold text-white mb-2">Jumlah Transaksi Harian</h3><div style="height:180px"><canvas id="dashTx"></canvas></div></div>
+    </section>
+
+    <!-- TAB 2: MANAJEMEN CABANG -->
+    <section id="tab-branches" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-bold text-white">Manajemen Cabang Nexora</h2>
+          <p class="text-xs text-[#8b949e]">Kelola cabang, buat unit baru, dan atur status operasional.</p>
+        </div>
+        <button onclick="openCreateBranchModal()" class="px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold hover:opacity-90">
+          <i class="fa-solid fa-plus"></i> Tambah Cabang Baru
+        </button>
+      </div>
+      <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+        <table class="w-full min-w-[760px] text-left text-xs">
+          <thead class="bg-[#21262d] text-[#8b949e]">
+            <tr>
+              <th class="p-4">Kode</th>
+              <th class="p-4">Nama Cabang</th>
+              <th class="p-4">Telepon / Alamat</th>
+              <th class="p-4">Saldo Aplikasi</th>
+              <th class="p-4">Kas Fisik</th>
+              <th class="p-4">Status</th>
+              <th class="p-4 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="branch-table-body" class="divide-y divide-[#30363d]">
+            <tr><td colspan="7" class="p-4 text-center text-[#8b949e]">Memuat data cabang...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 3: HAK AKSES PER CABANG -->
+    <section id="tab-permissions" class="hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white">Kontrol Hak Akses & Modul Cabang</h2>
+        <p class="text-xs text-[#8b949e]">Aktifkan atau nonaktifkan modul aplikasi secara terpisah per cabang.</p>
+      </div>
+      <div class="glass-card p-5 space-y-4">
+        <div class="flex items-center gap-4">
+          <label class="text-xs text-[#8b949e]">Pilih Cabang Target:</label>
+          <select id="perm-branch-select" onchange="loadBranchPermissions()" class="glass-input text-xs w-64">
+            <option value="">-- Pilih Cabang --</option>
+          </select>
+        </div>
+        <div id="permission-toggle-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-[#30363d]">
+          <!-- Dynamic Toggles -->
+        </div>
+        <div class="pt-4 flex justify-end">
+          <button onclick="saveBranchPermissions()" class="px-6 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold hover:opacity-90">
+            Simpan Konfigurasi Hak Akses
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: KONTROL SALDO HQ -->
+    <section id="tab-balances" class="hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white">Kontrol & Transfer Saldo HQ</h2>
+        <p class="text-xs text-[#8b949e]">Manajemen saldo atomik antar cabang dengan audit log otomatis.</p>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- PENYESUAIAN SALDO -->
+        <div class="glass-card p-5 space-y-4">
+          <h3 class="text-sm font-bold text-white">Penyesuaian Saldo Cabang</h3>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-[#8b949e]">Cabang Target</label>
+              <select id="adj-branch-id" class="glass-input text-xs w-full mt-1"></select>
+            </div>
+            <div>
+              <label class="text-xs text-[#8b949e]">Aksi Saldo</label>
+              <select id="adj-type" class="glass-input text-xs w-full mt-1">
+                <option value="add">Tambah Saldo (+) [Topup]</option>
+                <option value="subtract">Kurangi Saldo (-) [Penarikan]</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs text-[#8b949e]">Nominal (Rp)</label>
+              <input type="number" id="adj-amount" placeholder="0" class="glass-input text-xs w-full mt-1">
+            </div>
+            <div>
+              <label class="text-xs text-[#8b949e]">Alasan Penyesuaian</label>
+              <input type="text" id="adj-reason" placeholder="Contoh: Setoran modal HQ" class="glass-input text-xs w-full mt-1">
+            </div>
+            <button onclick="processBalanceAdjustment()" class="w-full py-3 bg-[#17A897] text-white font-semibold rounded-xl text-xs hover:opacity-90">
+              Eksekusi Penyesuaian Saldo
+            </button>
+          </div>
+        </div>
+
+        <!-- TRANSFER SALDO ANTAR CABANG -->
+        <div class="glass-card p-5 space-y-4">
+          <h3 class="text-sm font-bold text-white">Transfer Saldo Antar Cabang</h3>
+          <div class="space-y-3">
+            <div>
+              <label class="text-xs text-[#8b949e]">Cabang Pengirim (Sumber)</label>
+              <select id="trf-from-branch" class="glass-input text-xs w-full mt-1"></select>
+            </div>
+            <div>
+              <label class="text-xs text-[#8b949e]">Cabang Penerima (Tujuan)</label>
+              <select id="trf-to-branch" class="glass-input text-xs w-full mt-1"></select>
+            </div>
+            <div>
+              <label class="text-xs text-[#8b949e]">Nominal Transfer (Rp)</label>
+              <input type="number" id="trf-amount" placeholder="0" class="glass-input text-xs w-full mt-1">
+            </div>
+            <div>
+              <label class="text-xs text-[#8b949e]">Catatan / Referensi</label>
+              <input type="text" id="trf-notes" placeholder="Contoh: Perimbangan saldo antar unit" class="glass-input text-xs w-full mt-1">
+            </div>
+            <button onclick="processBranchTransfer()" class="w-full py-3 bg-sky-600 text-white font-semibold rounded-xl text-xs hover:opacity-90">
+              Transfer Saldo Atomik
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: AKUN KARYAWAN -->
+    <section id="tab-users" class="hidden space-y-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="text-xl font-bold text-white">Manajemen Akun Cabang & Karyawan</h2>
+          <p class="text-xs text-[#8b949e]">Kelola user, tentukan role, dan atur penempatan cabang.</p>
+        </div>
+        <button onclick="openCreateUserModal()" class="px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold hover:opacity-90">
+          <i class="fa-solid fa-user-plus"></i> Tambah User Baru
+        </button>
+      </div>
+      <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+        <table class="w-full min-w-[760px] text-left text-xs">
+          <thead class="bg-[#21262d] text-[#8b949e]">
+            <tr>
+              <th class="p-4">Nama User</th>
+              <th class="p-4">Email</th>
+              <th class="p-4">Role</th>
+              <th class="p-4">Cabang Penempatan</th>
+              <th class="p-4">Status</th>
+              <th class="p-4 text-right">Aksi</th>
+            </tr>
+          </thead>
+          <tbody id="user-table-body" class="divide-y divide-[#30363d]">
+            <tr><td colspan="6" class="p-4 text-center text-[#8b949e]">Memuat data user...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 6: MONITORING TRANSAKSI -->
+    <section id="tab-monitoring" class="hidden space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 class="text-xl font-bold text-white">Monitoring Transaksi Global</h2>
+          <p class="text-xs text-[#8b949e]">Pantau seluruh aktivitas transaksi dari semua unit cabang.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <select id="mon-filter-branch" onchange="loadGlobalTransactions()" class="glass-input text-xs">
+            <option value="all">Semua Cabang</option>
+          </select>
+          <button onclick="loadGlobalTransactions()" class="px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold hover:opacity-90">
+            Refresh Filter
+          </button>
+        </div>
+      </div>
+      <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+        <table class="w-full min-w-[760px] text-left text-xs">
+          <thead class="bg-[#21262d] text-[#8b949e]">
+            <tr>
+              <th class="p-4">ID Transaksi</th>
+              <th class="p-4">Waktu</th>
+              <th class="p-4">Cabang</th>
+              <th class="p-4">Tipe / Layanan</th>
+              <th class="p-4">Keterangan</th>
+              <th class="p-4 text-right">Nominal</th>
+              <th class="p-4 text-right">Biaya / Profit</th>
+              <th class="p-4">Status</th>
+            </tr>
+          </thead>
+          <tbody id="global-tx-table-body" class="divide-y divide-[#30363d]">
+            <tr><td colspan="8" class="p-4 text-center text-[#8b949e]">Memuat data transaksi...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- TAB 7: AUDIT LOG -->
+    <section id="tab-audit" class="hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white">Audit Log System (Immutable)</h2>
+        <p class="text-xs text-[#8b949e]">Rekam jejak aktivitas administrasi HQ yang tidak dapat diedit/dihapus.</p>
+      </div>
+      <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+        <table class="w-full min-w-[760px] text-left text-xs">
+          <thead class="bg-[#21262d] text-[#8b949e]">
+            <tr>
+              <th class="p-4">Waktu</th>
+              <th class="p-4">User Admin</th>
+              <th class="p-4">Role</th>
+              <th class="p-4">Aktivitas</th>
+              <th class="p-4">Cabang</th>
+              <th class="p-4">Keterangan Perubahan</th>
+            </tr>
+          </thead>
+          <tbody id="audit-table-body" class="divide-y divide-[#30363d]">
+            <tr><td colspan="6" class="p-4 text-center text-[#8b949e]">Memuat audit logs...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- JAVASCRIPT ENGINE -->
+  <script>
+    const sb = window.supabaseClient;
+    let branchesData = [];
+    let usersData = [];
+    let currentAdminRole = null;
+
+    document.addEventListener('DOMContentLoaded', initAdminPanel);
+
+    async function initAdminPanel() {
+      if (!sb) {
+        alert('Supabase client gagal dimuat!');
+        return;
+      }
+
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        window.location.replace('login.html');
+        return;
+      }
+
+      // Verifikasi Super Admin di server (role, status akun, status bisnis)
+      let me = null;
+      try {
+        me = await NexoraAuth.whoami(sb);
+      } catch (e) {
+        alert('Tidak dapat memverifikasi akun. Periksa koneksi lalu muat ulang.');
+        return;
+      }
+      if (!me || !me.allowed || me.role !== 'super_admin') {
+        alert('Akses Ditolak: Anda bukan Super Admin!');
+        window.location.replace('index.html');
+        return;
+      }
+      const roleRecord = { role: me.role, full_name: me.full_name };
+
+      document.getElementById('admin-user-name').textContent = roleRecord.full_name || 'Super Admin';
+      document.getElementById('admin-user-email').textContent = session.user.email;
+
+      await loadDashboardMetrics();
+      await loadBranches();
+    }
+
+    function switchAdminTab(tabName) {
+      document.querySelectorAll('main > section').forEach(el => el.classList.add('hidden'));
+      document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
+
+      document.getElementById(`tab-${tabName}`).classList.remove('hidden');
+      document.getElementById(`nav-${tabName}`).classList.add('active');
+
+      if (tabName === 'branches') loadBranches();
+      if (tabName === 'permissions') preparePermissionsTab();
+      if (tabName === 'balances') prepareBalancesTab();
+      if (tabName === 'users') loadUsers();
+      if (tabName === 'monitoring') loadGlobalTransactions();
+      if (tabName === 'audit') loadAuditLogs();
+    }
+
+    // FORMAT CURRENCY HELPER
+    function fmtRp(val) {
+      return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
+    }
+
+    // --- TAB 1: EXECUTIVE SUMMARY ---
+    async function loadDashboardMetrics() {
+      const { data: branches } = await sb.from('branches').select('*');
+      branchesData = branches || [];
+
+      const totalAppBal = branchesData.reduce((s, b) => s + Number(b.app_balance || 0), 0);
+      const totalCashBal = branchesData.reduce((s, b) => s + Number(b.cash_balance || 0), 0);
+      const activeCount = branchesData.filter(b => b.status === 'active').length;
+
+      document.getElementById('metric-total-branches').textContent = branchesData.length;
+      document.getElementById('metric-active-branches').textContent = `${activeCount} Aktif`;
+      document.getElementById('metric-total-app-balance').textContent = fmtRp(totalAppBal);
+      document.getElementById('metric-total-cash').textContent = fmtRp(totalCashBal);
+
+      // Populate Select Filters
+      const selects = ['filter-branch-overview', 'mon-filter-branch', 'adj-branch-id', 'trf-from-branch', 'trf-to-branch', 'perm-branch-select'];
+      selects.forEach(id => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const oldVal = el.value;
+        if (id.startsWith('filter') || id.startsWith('mon')) {
+          el.innerHTML = '<option value="all">Semua Cabang HQ</option>';
+        } else {
+          el.innerHTML = '<option value="">-- Pilih Cabang --</option>';
+        }
+        branchesData.forEach(b => {
+          el.innerHTML += `<option value="${b.id}">${b.code} - ${b.name}</option>`;
+        });
+        if (oldVal) el.value = oldVal;
+      });
+
+      renderPerformanceChart();
+    }
+
+    function renderPerformanceChart() {
+      const ctx = document.getElementById('chartBranchPerformance');
+      if (!ctx) return;
+      const labels = branchesData.map(b => b.name);
+      const balances = branchesData.map(b => b.app_balance);
+
+      const oldChart = Chart.getChart(ctx);
+      if (oldChart) oldChart.destroy();
+      new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Saldo Aplikasi (Rp)',
+            data: balances,
+            backgroundColor: '#17A897',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { ticks: { color: '#8b949e' } },
+            y: { ticks: { color: '#8b949e' } }
+          }
+        }
+      });
+    }
+
+    // --- TAB 2: MANAJEMEN CABANG ---
+    async function loadBranches() {
+      const { data: branches, error } = await sb.from('branches').select('*').order('created_at', { ascending: false });
+      const tbody = document.getElementById('branch-table-body');
+      if (error || !branches || branches.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="p-4 text-center text-[#8b949e]">Belum ada cabang terdaftar.</td></tr>';
+        return;
+      }
+      branchesData = branches;
+      tbody.innerHTML = branches.map(b => `
+        <tr class="hover:bg-[#21262d]/50">
+          <td class="p-4 font-mono font-bold text-sky-400">${b.code}</td>
+          <td class="p-4 font-semibold text-white">${b.name}</td>
+          <td class="p-4 text-[#8b949e]">${b.phone || '-'} <br><span class="text-[10px]">${b.address || ''}</span></td>
+          <td class="p-4 font-semibold text-[#17A897]">${fmtRp(b.app_balance)}</td>
+          <td class="p-4 font-semibold text-sky-400">${fmtRp(b.cash_balance)}</td>
+          <td class="p-4">
+            <span class="px-2 py-1 text-[10px] font-bold rounded-full ${b.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">
+              ${b.status.toUpperCase()}
+            </span>
+          </td>
+          <td class="p-4 text-right space-x-2">
+            <button onclick="toggleBranchStatus('${b.id}', '${b.status}')" class="px-2 py-1 bg-amber-500/10 text-amber-400 rounded hover:bg-amber-500/20 text-[10px]">
+              Switch Status
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function toggleBranchStatus(branchId, currentStatus) {
+      const nextStatus = currentStatus === 'active' ? 'inactive' : 'active';
+      if (!confirm(`Ubah status cabang menjadi ${nextStatus.toUpperCase()}?`)) return;
+
+      const { error } = await sb.from('branches').update({ status: nextStatus }).eq('id', branchId);
+      if (error) alert('Gagal mengubah status: ' + error.message);
+      else {
+        notify('Status cabang diperbarui!', 'success');
+        loadBranches();
+      }
+    }
+
+    function openCreateBranchModal() {
+      const code = prompt('Masukkan Kode Cabang Unik (Contoh: CBG-002):');
+      if (!code) return;
+      const name = prompt('Masukkan Nama Cabang:');
+      if (!name) return;
+
+      sb.from('branches').insert([{ code, name, status: 'active' }]).then(({ error }) => {
+        if (error) alert('Gagal menambah cabang: ' + error.message);
+        else {
+          notify('Cabang baru berhasil dibuat!', 'success');
+          loadBranches();
+        }
+      });
+    }
+
+    // --- TAB 3: HAK AKSES PER CABANG ---
+    function preparePermissionsTab() {
+      loadBranchPermissions();
+    }
+
+    async function loadBranchPermissions() {
+      const branchId = document.getElementById('perm-branch-select').value;
+      const container = document.getElementById('permission-toggle-grid');
+      if (!branchId) {
+        container.innerHTML = '<p class="text-xs text-[#8b949e] col-span-4">Silakan pilih cabang terlebih dahulu.</p>';
+        return;
+      }
+
+      const { data: perm } = await sb.from('branch_permissions').select('*').eq('branch_id', branchId).single();
+      const modules = [
+        { id: 'allow_dashboard', label: 'Dashboard Cabang' },
+        { id: 'allow_tarik_tunai', label: 'Tarik Tunai' },
+        { id: 'allow_setor_tunai', label: 'Setor Tunai' },
+        { id: 'allow_pindah_saldo', label: 'Pindah Saldo' },
+        { id: 'allow_ppob', label: 'Modul PPOB' },
+        { id: 'allow_kelola_produk', label: 'Tambah/Edit Produk Kasir' },
+        { id: 'allow_hutang', label: 'Catatan Hutang' },
+        { id: 'allow_riwayat', label: 'Riwayat Transaksi' },
+        { id: 'allow_laporan', label: 'Laporan Keuangan' },
+        { id: 'allow_export_excel', label: 'Ekspor File Excel' },
+        { id: 'allow_edit_transaksi', label: 'Edit Transaksi' },
+        { id: 'allow_kelola_saldo', label: 'Pengelolaan Saldo' }
+      ];
+
+      container.innerHTML = modules.map(m => {
+        const isChecked = perm ? perm[m.id] : true;
+        return `
+          <div class="flex items-center justify-between p-3 bg-[#0d1117] rounded-xl border border-[#30363d]">
+            <span class="text-xs font-semibold text-white">${m.label}</span>
+            <input type="checkbox" id="perm-${m.id}" ${isChecked ? 'checked' : ''} class="w-4 h-4 accent-[#17A897]">
+          </div>
+        `;
+      }).join('');
+    }
+
+    async function saveBranchPermissions() {
+      const branchId = document.getElementById('perm-branch-select').value;
+      if (!branchId) return alert('Pilih cabang terlebih dahulu!');
+
+      const payload = { branch_id: branchId };
+      const modules = ['allow_dashboard','allow_tarik_tunai','allow_setor_tunai','allow_pindah_saldo','allow_ppob','allow_kelola_produk','allow_hutang','allow_riwayat','allow_laporan','allow_export_excel','allow_edit_transaksi','allow_kelola_saldo'];
+      modules.forEach(m => {
+        payload[m] = document.getElementById(`perm-${m}`).checked;
+      });
+
+      const { branch_id: _bid, ...changes } = payload;
+      changes.updated_at = new Date().toISOString();
+      const { error } = await sb.from('branch_permissions').update(changes).eq('branch_id', branchId);
+      if (error) alert('Gagal menyimpan izin: ' + error.message);
+      else notify('Hak akses cabang disimpan!', 'success');
+    }
+
+    // --- TAB 4: KONTROL SALDO HQ ---
+    function prepareBalancesTab() {
+      loadDashboardMetrics();
+    }
+
+    async function processBalanceAdjustment() {
+      const branchId = document.getElementById('adj-branch-id').value;
+      const type = document.getElementById('adj-type').value;
+      const amount = Number(document.getElementById('adj-amount').value);
+      const reason = document.getElementById('adj-reason').value.trim();
+
+      if (!branchId || amount <= 0 || !reason) {
+        return alert('Lengkapi semua kolom penyesuaian saldo!');
+      }
+
+      const { data: { session } } = await sb.auth.getSession();
+      const { data, error } = await sb.rpc('nx_adjust_branch_balance', {
+        p_branch_id: branchId,
+        p_amount: amount,
+        p_type: type,
+        p_reason: reason,
+        p_admin_user_id: session.user.id
+      });
+
+      if (error) alert('Gagal eksekusi saldo: ' + error.message);
+      else {
+        notify('Penyesuaian saldo berhasil!', 'success');
+        document.getElementById('adj-amount').value = '';
+        document.getElementById('adj-reason').value = '';
+        loadDashboardMetrics();
+      }
+    }
+
+    async function processBranchTransfer() {
+      const fromId = document.getElementById('trf-from-branch').value;
+      const toId = document.getElementById('trf-to-branch').value;
+      const amount = Number(document.getElementById('trf-amount').value);
+      const notes = document.getElementById('trf-notes').value.trim();
+
+      if (!fromId || !toId || amount <= 0) {
+        return alert('Pilih cabang asal, cabang tujuan, dan nominal valid!');
+      }
+
+      const { data: { session } } = await sb.auth.getSession();
+      const { data, error } = await sb.rpc('nx_transfer_branch_balance', {
+        p_from_branch_id: fromId,
+        p_to_branch_id: toId,
+        p_amount: amount,
+        p_notes: notes,
+        p_admin_user_id: session.user.id
+      });
+
+      if (error) alert('Transfer gagal: ' + error.message);
+      else {
+        notify('Transfer saldo antar cabang sukses!', 'success');
+        document.getElementById('trf-amount').value = '';
+        document.getElementById('trf-notes').value = '';
+        loadDashboardMetrics();
+      }
+    }
+
+    // --- TAB 5: AKUN KARYAWAN ---
+    const escHtml = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const ROLE_TXT = { super_admin: 'SUPER ADMIN', admin_cabang: 'ADMIN CABANG', employee: 'KARYAWAN' };
+
+    async function loadUsers() {
+      const { data: users, error } = await sb.from('user_roles').select('*, branches(name)').order('created_at', { ascending: false });
+      const tbody = document.getElementById('user-table-body');
+      if (error || !users || users.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-[#8b949e]">Belum ada user.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = users.map(u => {
+        const self = u.role === 'super_admin';
+        const act = self ? '--' :
+          `<button onclick="toggleUserActive('${escHtml(u.user_id)}', ${u.is_active ? 'false' : 'true'})" class="text-[10px] px-2 py-1 rounded-lg border border-[#30363d] text-white mr-1">${u.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button>` +
+          `<button onclick="openUserPerms('${escHtml(u.user_id)}')" class="text-[10px] px-2 py-1 rounded-lg border border-[#30363d] text-amber-400 mr-1">Izin</button>` +
+          `<button onclick="sendResetPassword('${escHtml(u.email)}')" class="text-[10px] px-2 py-1 rounded-lg border border-[#30363d] text-[#17A897]">Reset Password</button>`;
+        return `
+        <tr class="hover:bg-[#21262d]/50">
+          <td class="p-4 font-semibold text-white">${escHtml(u.full_name || '-')}<div class="text-[10px] text-[#8b949e]">${escHtml(u.username ? '@' + u.username : '')}</div></td>
+          <td class="p-4 text-[#8b949e]">${escHtml(u.email)}</td>
+          <td class="p-4"><span class="px-2 py-1 bg-sky-500/10 text-sky-400 font-bold rounded-full text-[10px]">${escHtml(ROLE_TXT[u.role] || u.role)}</span></td>
+          <td class="p-4 text-white">${escHtml(u.branches ? u.branches.name : '-')}</td>
+          <td class="p-4"><span class="text-[10px] ${u.is_active ? 'text-emerald-400' : 'text-red-400'}">${u.is_active ? 'Aktif' : 'Nonaktif'}</span></td>
+          <td class="p-4 text-right whitespace-nowrap">${act}</td>
+        </tr>`;
+      }).join('');
+    }
+
+    function openCreateUserModal() {
+      const sel = document.getElementById('nu-branch');
+      sel.innerHTML = '<option value="">-- Pilih Cabang --</option>' +
+        (branchesData || []).map(b => `<option value="${escHtml(b.id)}">${escHtml(b.code)} - ${escHtml(b.name)}</option>`).join('');
+      ['nu-name', 'nu-username', 'nu-email', 'nu-pass'].forEach(i => document.getElementById(i).value = '');
+      document.getElementById('modal-new-user').classList.remove('hidden');
+    }
+    function closeCreateUserModal() { document.getElementById('modal-new-user').classList.add('hidden'); }
+
+    async function submitCreateUser() {
+      const g = i => document.getElementById(i).value.trim();
+      const body = { full_name: g('nu-name'), username: g('nu-username').toLowerCase(), email: g('nu-email'),
+        password: document.getElementById('nu-pass').value, role: g('nu-role'), branch_id: g('nu-branch') };
+      if (!body.full_name || !body.username || !body.email || !body.password || !body.branch_id) return alert('Semua kolom wajib diisi.');
+      const btn = document.getElementById('nu-submit'); btn.disabled = true; btn.textContent = 'Menyimpan...';
+      try {
+        const { error } = await sb.functions.invoke('create-account', { body });
+        if (error) {
+          let msg = 'Gagal membuat akun.';
+          try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e) { /* abaikan */ }
+          alert(msg);
+        } else {
+          closeCreateUserModal();
+          alert('Akun berhasil dibuat. Penerima bisa langsung login dengan email dan password awal tersebut.');
+          loadUsers();
+        }
+      } finally { btn.disabled = false; btn.textContent = 'Buat Akun'; }
+    }
+
+    async function toggleUserActive(userId, active) {
+      if (!confirm(active ? 'Aktifkan akun ini?' : 'Nonaktifkan akun ini? Akun tidak bisa masuk lagi.')) return;
+      const { error } = await sb.from('user_roles').update({ is_active: active, updated_at: new Date().toISOString() }).eq('user_id', userId);
+      if (error) alert('Gagal mengubah status: ' + error.message);
+      loadUsers();
+    }
+
+
+    const PERM_FEATURES = [
+      ['dashboard', 'Dashboard'], ['tarik_tunai', 'Tarik Tunai'], ['setor_tunai', 'Setor Tunai'],
+      ['pindah_saldo', 'Pindah Saldo'], ['ppob', 'PPOB'], ['kelola_produk', 'Tambah/Edit Produk Kasir'], ['hutang', 'Hutang'],
+      ['riwayat', 'Riwayat Transaksi'], ['laporan', 'Laporan'], ['export_excel', 'Ekspor Excel'],
+      ['edit_transaksi', 'Edit Transaksi'], ['kelola_saldo', 'Pengelolaan Saldo']
+    ];
+    let permEditUser = null;
+
+    async function openUserPerms(userId) {
+      const { data: u, error } = await sb.from('user_roles').select('user_id, full_name, email, branch_id, permissions').eq('user_id', userId).single();
+      if (error || !u) return alert('Gagal memuat akun: ' + (error ? error.message : ''));
+      const { data: bp } = await sb.from('branch_permissions').select('*').eq('branch_id', u.branch_id).maybeSingle();
+      permEditUser = u;
+      const cur = u.permissions || {};
+      document.getElementById('up-title').textContent = 'Izin: ' + (u.full_name || u.email);
+      document.getElementById('up-list').innerHTML = PERM_FEATURES.map(([k, label]) => {
+        const branchOff = bp && bp['allow_' + k] === false;
+        return `<label class="flex items-center justify-between gap-2 p-2 rounded-lg border border-[#30363d] ${branchOff ? 'opacity-50' : ''}">
+          <span class="text-xs text-white">${escHtml(label)}${branchOff ? '<span class="block text-[10px] text-red-400">dimatikan di cabang</span>' : ''}</span>
+          <input type="checkbox" id="up-${k}" ${cur[k] !== false && !branchOff ? 'checked' : ''} ${branchOff ? 'disabled' : ''}>
+        </label>`;
+      }).join('');
+      document.getElementById('modal-user-perms').classList.remove('hidden');
+    }
+    function closeUserPerms() { document.getElementById('modal-user-perms').classList.add('hidden'); permEditUser = null; }
+
+    async function saveUserPerms() {
+      if (!permEditUser) return;
+      const perms = Object.assign({}, permEditUser.permissions || {});
+      PERM_FEATURES.forEach(([k]) => {
+        const el = document.getElementById('up-' + k);
+        if (el && !el.disabled) perms[k] = el.checked;
+      });
+      const { error } = await sb.from('user_roles').update({ permissions: perms, updated_at: new Date().toISOString() }).eq('user_id', permEditUser.user_id);
+      if (error) return alert('Gagal menyimpan izin: ' + error.message);
+      closeUserPerms();
+      notify('Izin akun disimpan!', 'success');
+      loadUsers();
+    }
+
+    async function sendResetPassword(email) {
+      if (!confirm('Kirim email reset password ke ' + email + '?')) return;
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: new URL('reset.html', window.location.href).href });
+      alert(error ? 'Gagal mengirim: ' + error.message : 'Email reset password dikirim.');
+    }
+
+    // --- TAB 6: MONITORING TRANSAKSI ---
+    async function loadGlobalTransactions() {
+      const { data: txs } = await sb.from('transactions').select('*').order('date', { ascending: false }).limit(50);
+      const tbody = document.getElementById('global-tx-table-body');
+      if (!txs || txs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-[#8b949e]">Belum ada transaksi recorded.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = txs.map(t => `
+        <tr class="hover:bg-[#21262d]/50">
+          <td class="p-4 font-mono text-sky-400">${t.id.slice(0, 8)}...</td>
+          <td class="p-4 text-[#8b949e]">${new Date(t.date).toLocaleString('id-ID')}</td>
+          <td class="p-4 text-white">Cabang HQ</td>
+          <td class="p-4 font-semibold text-white">${t.type.toUpperCase()}</td>
+          <td class="p-4 text-[#8b949e]">${t.notes || '-'}</td>
+          <td class="p-4 text-right font-semibold text-[#17A897]">${fmtRp(t.admin_fee)}</td>
+          <td class="p-4 text-right font-semibold text-emerald-400">${fmtRp(t.profit)}</td>
+          <td class="p-4"><span class="px-2 py-1 text-[10px] bg-emerald-500/10 text-emerald-400 rounded-full">Success</span></td>
+        </tr>
+      `).join('');
+    }
+
+    // --- TAB 7: AUDIT LOGS ---
+    async function loadAuditLogs() {
+      const { data: logs } = await sb.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50);
+      const tbody = document.getElementById('audit-table-body');
+      if (!logs || logs.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-[#8b949e]">Belum ada catatan audit.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = logs.map(l => `
+        <tr class="hover:bg-[#21262d]/50">
+          <td class="p-4 text-[#8b949e]">${new Date(l.created_at).toLocaleString('id-ID')}</td>
+          <td class="p-4 font-semibold text-white">${l.user_email}</td>
+          <td class="p-4 text-sky-400 font-mono">${l.user_role}</td>
+          <td class="p-4 font-bold text-amber-400">${l.action_type}</td>
+          <td class="p-4 text-white">${l.branch_name || 'HQ'}</td>
+          <td class="p-4 text-[#8b949e]">${l.description}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function handleLogout() {
+      try { await sb.rpc('nx_log_auth_event', { p_type: 'LOGOUT' }); } catch (e) { /* abaikan */ }
+      await sb.auth.signOut();
+      window.location.replace('login.html');
+    }
+  </script>
+  <script>
+    // Dashboard Admin Utama v2: angka dari nx_dashboard_stats (server), bukan hitungan di browser
+    (function () {
+      const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+      const wib = d => new Date(d.getTime() + 7 * 3600e3).toISOString().slice(0, 10);
+      const put = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+      const LABEL = { today: 'Hari Ini', '7': '7 Hari', '30': '30 Hari' };
+      function draw(id, cfg) {
+        const el = document.getElementById(id); if (!el) return;
+        const old = Chart.getChart(el); if (old) old.destroy();
+        new Chart(el, cfg);
+      }
+      const base = { responsive: true, maintainAspectRatio: false, plugins: { legend: { labels: { color: '#8b949e', boxWidth: 10 } } },
+        scales: { x: { ticks: { color: '#8b949e' }, grid: { display: false } }, y: { ticks: { color: '#8b949e' }, grid: { color: '#21262d' } } } };
+
+      async function renderDashV2() {
+        const key = document.getElementById('dash-range').value;
+        const days = { today: 0, '7': 6, '30': 29 }[key];
+        const now = new Date();
+        const brSel = document.getElementById('filter-branch-overview');
+        const branch = brSel && brSel.value && brSel.value !== 'all' ? brSel.value : null;
+        const { data: st, error } = await sb.rpc('nx_dashboard_stats', {
+          p_from: wib(new Date(now.getTime() - days * 864e5)), p_to: wib(now), p_branch: branch });
+        if (error) throw error;
+
+        put('metric-total-branches', st.branches);
+        put('metric-active-branches', (st.branches - st.branches_inactive) + ' Aktif');
+        put('metric-total-app-balance', fmtRp(st.app_balance));
+        put('metric-total-cash', fmtRp(st.cash_balance));
+        put('metric-today-omzet', fmtRp(st.omzet));
+        put('metric-today-profit', 'Untung: ' + fmtRp(st.profit));
+        const lbl = document.getElementById('metric-today-omzet');
+        if (lbl && lbl.parentElement.querySelector('span')) lbl.parentElement.querySelector('span').textContent = 'Omzet ' + LABEL[key];
+        const opt = brSel && brSel.selectedOptions && brSel.selectedOptions[0];
+        const cap = branch && opt ? opt.textContent : 'Seluruh Cabang';
+        put('cap-app', cap); put('cap-cash', cap);
+        put('dash-inactive', st.branches_inactive);
+        put('dash-employees', st.employees);
+        put('dash-tx', st.tx_count);
+        put('dash-pending', st.tx_pending);
+        put('dash-failed', st.tx_failed);
+        put('dash-ok', st.tx_count - st.tx_pending - st.tx_failed);
+
+        const labels = st.daily.map(r => r.d.slice(5));
+        draw('dashDaily', { type: 'bar', data: { labels, datasets: [
+          { label: 'Omzet', data: st.daily.map(r => r.omzet), backgroundColor: '#17A89799' },
+          { label: 'Untung', data: st.daily.map(r => r.profit), type: 'line', borderColor: '#fbbf24', tension: .3 }] }, options: base });
+        draw('dashTx', { type: 'bar', data: { labels, datasets: [{ label: 'Transaksi', data: st.daily.map(r => r.n), backgroundColor: '#38bdf899' }] }, options: base });
+        draw('chartBranchPerformance', { type: 'bar', data: { labels: st.by_branch.map(r => r.name), datasets: [
+          { label: 'Omzet', data: st.by_branch.map(r => r.omzet), backgroundColor: '#17A89799' },
+          { label: 'Untung', data: st.by_branch.map(r => r.profit), backgroundColor: '#fbbf2499' }] }, options: base });
+
+        let q = sb.from('audit_logs').select('action_type,description,branch_name,user_email,created_at').order('created_at', { ascending: false }).limit(10);
+        if (branch) q = q.eq('branch_id', branch);
+        const act = await q;
+        const box = document.getElementById('recent-hq-activities');
+        if (box && !act.error) {
+          box.innerHTML = (act.data || []).map(a => '<div class="py-2 border-b border-[#30363d] text-xs"><span class="text-[#17A897] font-semibold">' + esc(a.action_type) + '</span> ' +
+            (a.branch_name ? '<span class="text-white">' + esc(a.branch_name) + '</span> ' : '') + '<span class="text-[#8b949e]">' + esc(a.description || '') + '</span>' +
+            '<div class="text-[10px] text-[#484f58]">' + esc(a.user_email || '') + ' · ' + esc(new Date(a.created_at).toLocaleString('id-ID')) + '</div></div>').join('') ||
+            '<p class="text-xs text-[#8b949e]">Belum ada aktivitas.</p>';
+        }
+      }
+      const prev = window.loadDashboardMetrics;   // fungsi lama tetap dipanggil (mengisi dropdown cabang di menu lain)
+      window.loadDashboardMetrics = async function () {
+        try { await prev(); } catch (e) { console.error('Muat cabang:', e); }
+        try { await renderDashV2(); } catch (e) { console.error('Dashboard:', e); }
+      };
+    })();
+  </script>
+
+  <div id="modal-new-user" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="glass-card p-5 w-full max-w-md space-y-3">
+      <h3 class="text-base font-bold text-white">Tambah Akun Baru</h3>
+      <input id="nu-name" class="glass-input text-xs w-full" placeholder="Nama lengkap" autocomplete="off">
+      <input id="nu-username" class="glass-input text-xs w-full" placeholder="Username (huruf kecil, angka, . _)" autocapitalize="none" autocomplete="off">
+      <input id="nu-email" type="email" class="glass-input text-xs w-full" placeholder="Email" autocomplete="off">
+      <input id="nu-pass" type="password" class="glass-input text-xs w-full" placeholder="Password awal (min. 8 karakter)" autocomplete="new-password">
+      <select id="nu-role" class="glass-input text-xs w-full"><option value="employee">Karyawan</option><option value="admin_cabang">Admin Cabang</option></select>
+      <select id="nu-branch" class="glass-input text-xs w-full"></select>
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeCreateUserModal()" class="flex-1 px-4 py-2 rounded-xl text-xs border border-[#30363d] text-white">Batal</button>
+        <button id="nu-submit" onclick="submitCreateUser()" class="flex-1 px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold">Buat Akun</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-user-perms" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="glass-card p-5 w-full max-w-md space-y-3 max-h-[90vh] overflow-y-auto">
+      <h3 class="text-base font-bold text-white" id="up-title">Izin akun</h3>
+      <p class="text-[10px] text-[#8b949e]">Akun hanya bisa memakai fitur yang diizinkan cabang DAN akun ini. Fitur yang dimatikan di cabang tidak bisa dinyalakan di sini.</p>
+      <div id="up-list" class="grid grid-cols-1 gap-2"></div>
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeUserPerms()" class="flex-1 px-4 py-2 rounded-xl text-xs border border-[#30363d] text-white">Batal</button>
+        <button onclick="saveUserPerms()" class="flex-1 px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold">Simpan Izin</button>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

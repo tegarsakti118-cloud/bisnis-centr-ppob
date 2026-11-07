@@ -212,7 +212,8 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     let all = [];
     for (;;) {
       let q = sb.from(table).select('*');
-      if (withUser) q = q.eq('user_id', currentUserId);
+      // Data dibatasi per CABANG oleh aturan akses di database (RLS), bukan per user,
+      // supaya karyawan melihat riwayat seluruh cabangnya.
       q = q.gte('date', start.toISOString()).lt('date', endExcl.toISOString())
         .order('date', { ascending: false }).order('id', { ascending: false })
         .range(from, from + size - 1);

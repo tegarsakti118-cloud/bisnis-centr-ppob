@@ -10,7 +10,7 @@
 //
 // Mengubah daftar file di SHELL? Naikkan VERSION agar cache lama dibersihkan.
 // ==========================================
-const VERSION = 'nexora-v9';
+const VERSION = 'nexora-v12';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -19,12 +19,14 @@ const SHELL = [
   'index.html',
   'login.html',
   'register.html',
+  'admin.html',
   'forgot.html',
   'reset.html',
   'manifest.json',
   'css/style.css',
   'js/supabase.js',
   'js/auth-ui.js',
+  'js/role-guard.js',
   'js/config.js',
   'js/validation.js',
   'js/app.js',

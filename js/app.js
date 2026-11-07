@@ -66,6 +66,26 @@ async function bootApp() {
   currentUserId = session.user.id;
   currentUserEmail = session.user.email || '';
 
+  // Verifikasi akun, role, dan status cabang di server (bukan dari localStorage)
+  try {
+    const { data: me, error: meErr } = await sb.rpc('nx_whoami');
+    if (meErr) throw meErr;
+    if (!me || !me.allowed) {
+      const reason = me && me.reason;
+      await sb.auth.signOut();
+      try { sessionStorage.setItem('nx_login_msg', window.NexoraAuth ? NexoraAuth.blockMessage(reason) : 'Akun Anda tidak dapat masuk.'); } catch (e) { /* abaikan */ }
+      window.location.replace('login.html');
+      return;
+    }
+    window.nxMe = me;
+    if (window.NexoraAuth) NexoraAuth.applyMenu(me);
+  } catch (err) {
+    console.error('Gagal memverifikasi akun:', err);
+    document.body.classList.remove('auth-pending');
+    showNotification('Tidak dapat memverifikasi akun. Periksa koneksi lalu muat ulang.', 'error');
+    return;
+  }
+
   // Jika sesi berakhir / logout dari tab lain -> kembali ke login
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') window.location.replace('login.html');
@@ -90,7 +110,20 @@ function renderUserWidget() {
   const nameEl = document.querySelector('.user-name');
   const roleEl = document.querySelector('.user-role');
   if (nameEl) nameEl.textContent = currentUserEmail || 'Owner Nexora';
-  if (roleEl) roleEl.textContent = 'Cloud - Terhubung';
+  const me = window.nxMe;
+  if (roleEl) {
+    roleEl.textContent = me && window.NexoraAuth
+      ? NexoraAuth.roleLabel(me.role) + (me.branch_name ? ' · ' + me.branch_name : '')
+      : 'Cloud - Terhubung';
+    if (me && me.role === 'super_admin' && !document.getElementById('nx-admin-link')) {
+      const a = document.createElement('a');
+      a.id = 'nx-admin-link';
+      a.href = 'admin.html';
+      a.textContent = 'Buka Panel Admin';
+      a.style.cssText = 'display:block;margin-top:6px;font-size:11px;color:#17A897;text-decoration:none;';
+      roleEl.insertAdjacentElement('afterend', a);
+    }
+  }
 }
 
 function isAuthError(err) {
@@ -610,6 +643,12 @@ const PAGE_LOADERS = {
 };
 
 function switchPage(pageTarget) {
+  if (window.nxMe && window.NexoraAuth && !NexoraAuth.pageAllowed(window.nxMe, pageTarget)) {
+    showNotification('Fitur ini tidak diizinkan untuk akun atau cabang Anda.', 'error');
+    const alt = NexoraAuth.firstAllowed(window.nxMe);
+    if (alt !== pageTarget) switchPage(alt);
+    return;
+  }
   // Tutup sidebar PERTAMA: error di loader halaman tidak boleh meninggalkan overlay menutupi layar
   closeSidebar();
 
@@ -996,6 +1035,11 @@ function initVoucherPage() {
   // Keranjang & pencarian produk (js/kasir.js)
   if (typeof renderKasirCart === 'function') renderKasirCart();
 
+  // Izin "Tambah/Edit Produk": karyawan tanpa izin tetap bisa berjualan, tapi tidak bisa mengubah produk
+  const canManageProduct = !window.nxMe || !window.nxMe.perms || window.nxMe.perms.kelola_produk !== false;
+  const addBtn = document.getElementById('btn-add-voucher-modal');
+  if (addBtn) addBtn.style.display = canManageProduct ? '' : 'none';
+
   const listEl = document.getElementById('voucher-master-list');
   if (!listEl) return;
 
@@ -1015,12 +1059,12 @@ function initVoucherPage() {
           <span style="font-size:14px; font-weight:700; color:#34d399; display:block;">${formatRupiah(v.price)}</span>
           <span style="font-size:11px; color:${Number(v.stock) > 0 ? '#38bdf8' : '#f87171'};">Stok: ${Number(v.stock) || 0} pcs</span>
         </div>
-        <button type="button" class="btn-mini btn-mini-blue" onclick="updateStock('${escapeHtml(v.id)}')" title="Ubah Stok">
+        ${canManageProduct ? `<button type="button" class="btn-mini btn-mini-blue" onclick="updateStock('${escapeHtml(v.id)}')" title="Ubah Stok">
           <i class="fa-solid fa-pen-to-square"></i> Stok
         </button>
         <button type="button" class="btn-mini btn-mini-red" onclick="deleteProduct('${escapeHtml(v.id)}')" title="Hapus Produk">
           <i class="fa-solid fa-trash-can"></i>
-        </button>
+        </button>` : ''}
       </div>
     </div>
   `).join('');
