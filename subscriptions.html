@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Manajemen Langganan Klien - Nexora</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/auth-ui.js"></script>
+  <script src="js/role-guard.js"></script>
+
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: #0d1117; color: #e6edf3; }
+    .glass-card { background: #161b22; border: 1px solid #30363d; border-radius: 16px; }
+    .glass-input { background: #0d1117; border: 1px solid #30363d; color: #fff; border-radius: 8px; padding: 8px 12px; outline: none; }
+    .glass-input:focus { border-color: #17A897; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+
+  <div class="max-w-6xl mx-auto space-y-6">
+    
+    <!-- HEADER -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-[#30363d]">
+      <div class="flex items-center gap-3">
+        <a href="admin.html" class="w-10 h-10 rounded-xl bg-[#21262d] border border-[#30363d] flex items-center justify-center text-white hover:bg-[#30363d] transition" title="Kembali ke Panel Admin">
+          <i class="fa-solid fa-arrow-left"></i>
+        </a>
+        <div>
+          <h1 class="text-xl font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-crown text-amber-400"></i> Kontrol Lisensi & Langganan
+          </h1>
+          <p class="text-xs text-[#8b949e]">Kelola masa aktif trial, perpanjang langganan klien, dan pantau expired.</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button onclick="loadClientsTable()" class="px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold hover:opacity-90 flex items-center gap-2">
+          <i class="fa-solid fa-rotate"></i> Refresh Data
+        </button>
+        <a href="admin.html" class="px-4 py-2 bg-[#21262d] border border-[#30363d] text-white rounded-xl text-xs font-semibold hover:bg-[#30363d]">
+          Dashboard HQ
+        </a>
+      </div>
+    </header>
+
+    <!-- METRICS RINGKASAN -->
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      <div class="glass-card p-4">
+        <span class="text-xs text-[#8b949e]">Total Klien Terdaftar</span>
+        <h3 class="text-xl font-bold text-white mt-1" id="m-total-clients">0</h3>
+      </div>
+      <div class="glass-card p-4">
+        <span class="text-xs text-[#8b949e]">Klien Aktif / Trial</span>
+        <h3 class="text-xl font-bold text-emerald-400 mt-1" id="m-active-clients">0</h3>
+      </div>
+      <div class="glass-card p-4">
+        <span class="text-xs text-[#8b949e]">Kedaluwarsa (Expired)</span>
+        <h3 class="text-xl font-bold text-red-400 mt-1" id="m-expired-clients">0</h3>
+      </div>
+      <div class="glass-card p-4">
+        <span class="text-xs text-[#8b949e]">Lifetime (Owner)</span>
+        <h3 class="text-xl font-bold text-sky-400 mt-1" id="m-lifetime-clients">0</h3>
+      </div>
+    </div>
+
+    <!-- PENCARIAN -->
+    <div class="glass-card p-4 flex flex-col md:flex-row items-center justify-between gap-3">
+      <div class="w-full md:w-80 relative">
+        <i class="fa-solid fa-magnifying-glass absolute left-3 top-1/2 -translate-y-1/2 text-[#8b949e] text-xs"></i>
+        <input type="text" id="search-client" oninput="filterClients()" placeholder="Cari nama bisnis klien..." class="glass-input text-xs w-full pl-8">
+      </div>
+      <div class="text-xs text-[#8b949e]">
+        Total: <span id="client-count-label" class="font-bold text-white">0</span> bisnis
+      </div>
+    </div>
+
+    <!-- TABEL KLIEN -->
+    <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+      <table class="w-full min-w-[760px] text-left text-xs">
+        <thead class="bg-[#21262d] text-[#8b949e]">
+          <tr>
+            <th class="p-4">Nama Bisnis Klien</th>
+            <th class="p-4">Status Akun</th>
+            <th class="p-4">Berlaku Sampai</th>
+            <th class="p-4">Sisa Waktu</th>
+            <th class="p-4 text-right">Tambah Masa Aktif</th>
+          </tr>
+        </thead>
+        <tbody id="clients-tbody" class="divide-y divide-[#30363d]">
+          <tr><td colspan="5" class="p-6 text-center text-[#8b949e]">Memuat data klien...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+
+  <script>
+    const sb = window.supabaseClient;
+    let allClients = [];
+
+    const escHtml = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      if (!sb) {
+        alert('Supabase client gagal dimuat!');
+        return;
+      }
+
+      // Verifikasi hak akses: HANYA Super Admin yang boleh buka halaman ini
+      try {
+        const { data: { user } } = await sb.auth.getUser();
+        if (!user) {
+          window.location.replace('login.html');
+          return;
+        }
+
+        // KUNCI DEVELOPER: Ganti 'email_kamu@gmail.com' dengan email asli akun lu!
+        const DEVELOPER_EMAIL = 'sakapay404@gmail.com'; // <-- GANTI DENGAN EMAIL LU
+
+        if (user.email.toLowerCase() !== DEVELOPER_EMAIL.toLowerCase()) {
+          alert('Akses Ditolak: Halaman khusus Developer Platform Nexora.');
+          window.location.replace('index.html');
+          return;
+        }
+      } catch (err) {
+        console.error(err);
+        window.location.replace('login.html');
+        return;
+      } {
+        console.error(err);
+        window.location.replace('login.html');
+        return;
+      }
+
+      await loadClientsTable();
+    });
+
+    async function loadClientsTable() {
+      const tbody = document.getElementById('clients-tbody');
+      tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-[#8b949e]">Mengambil data terbaru...</td></tr>';
+
+      const { data, error } = await sb.from('businesses').select('*').order('created_at', { ascending: false });
+      if (error) {
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-400">Gagal: ${escHtml(error.message)}</td></tr>`;
+        return;
+      }
+
+      allClients = data || [];
+      updateMetrics();
+      renderTable(allClients);
+    }
+
+    function updateMetrics() {
+      const now = new Date();
+      let active = 0, expired = 0, lifetime = 0;
+
+      allClients.forEach(b => {
+        const exp = b.subscription_until ? new Date(b.subscription_until) : null;
+        const days = exp ? Math.ceil((exp - now) / (1000 * 60 * 60 * 24)) : 0;
+        if (days > 365) lifetime++;
+        else if (days > 0) active++;
+        else expired++;
+      });
+
+      document.getElementById('m-total-clients').textContent = allClients.length;
+      document.getElementById('m-active-clients').textContent = active;
+      document.getElementById('m-expired-clients').textContent = expired;
+      document.getElementById('m-lifetime-clients').textContent = lifetime;
+    }
+
+    function renderTable(list) {
+      const tbody = document.getElementById('clients-tbody');
+      document.getElementById('client-count-label').textContent = list.length;
+
+      if (!list.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-[#8b949e]">Tidak ada bisnis yang cocok.</td></tr>';
+        return;
+      }
+
+      const now = new Date();
+
+      tbody.innerHTML = list.map(b => {
+        const exp = b.subscription_until ? new Date(b.subscription_until) : null;
+        const daysLeft = exp ? Math.ceil((exp - now) / (1000 * 60 * 60 * 24)) : 0;
+        const isLifetime = daysLeft > 365;
+
+        let badge = '';
+        if (isLifetime) {
+          badge = '<span class="px-2.5 py-1 bg-sky-500/10 text-sky-400 font-bold rounded-full text-[10px] border border-sky-500/20">LIFETIME</span>';
+        } else if (daysLeft > 0) {
+          const color = daysLeft <= 3 ? 'text-amber-400 bg-amber-500/10 border-amber-500/20' : 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+          badge = `<span class="px-2.5 py-1 ${color} font-bold rounded-full text-[10px] border">${daysLeft} Hari Lagi</span>`;
+        } else {
+          badge = '<span class="px-2.5 py-1 bg-red-500/10 text-red-400 font-bold rounded-full text-[10px] border border-red-500/20">EXPIRED</span>';
+        }
+
+        const dateTxt = exp ? exp.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' }) : 'Tidak Terbatas';
+
+        return `
+          <tr class="hover:bg-[#21262d]/50 transition">
+            <td class="p-4 font-bold text-white">${escHtml(b.name)}</td>
+            <td class="p-4"><span class="text-[10px] uppercase font-bold text-[#8b949e]">${escHtml(b.status || 'ACTIVE')}</span></td>
+            <td class="p-4 text-white font-mono">${dateTxt}</td>
+            <td class="p-4">${badge}</td>
+            <td class="p-4 text-right space-x-1.5 whitespace-nowrap">
+              <button onclick="extendSubscription('${b.id}', 30)" class="px-2.5 py-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 rounded-lg hover:bg-emerald-500/25 text-[10px] font-semibold transition">+1 Bulan</button>
+              <button onclick="extendSubscription('${b.id}', 180)" class="px-2.5 py-1.5 bg-sky-500/15 text-sky-400 border border-sky-500/30 rounded-lg hover:bg-sky-500/25 text-[10px] font-semibold transition">+6 Bulan</button>
+              <button onclick="extendSubscription('${b.id}', 365)" class="px-2.5 py-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/30 rounded-lg hover:bg-amber-500/25 text-[10px] font-semibold transition">+1 Tahun</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    function filterClients() {
+      const q = document.getElementById('search-client').value.trim().toLowerCase();
+      const filtered = allClients.filter(b => String(b.name || '').toLowerCase().includes(q));
+      renderTable(filtered);
+    }
+
+    async function extendSubscription(bizId, days) {
+      if (!confirm(`Tambahkan masa aktif bisnis ini selama ${days} hari?`)) return;
+
+      const { data, error } = await sb.rpc('nx_extend_subscription', {
+        p_business_id: bizId,
+        p_days: days
+      });
+
+      if (error) {
+        alert('Gagal: ' + error.message);
+        return;
+      }
+
+      notify(`Masa aktif berhasil diperpanjang ${days} hari!`, 'success');
+      loadClientsTable();
+    }
+  </script>
+</body>
+</html>

@@ -30,6 +30,7 @@
 
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <link rel="stylesheet" href="css/style.css?v=2.6">
 </head>
 <body class="auth-pending">
@@ -457,10 +458,19 @@
               <div class="glass-card kasir-search-box">
                 <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
                 <input type="text" id="kasir-search" placeholder="Cari nama produk atau barcode..." autocomplete="off" autocapitalize="off" spellcheck="false" aria-label="Cari produk">
+                <button type="button" id="btn-scan-camera" title="Scan Barcode Kamera" style="background:none; border:none; color:var(--primary-color); font-size:18px; padding:0 8px; cursor:pointer;">
+                  <i class="fa-solid fa-camera"></i>
+                </button>
+              </div>
+              <!-- Kotak preview kamera HP saat scan aktif -->
+              <div id="scanner-reader-wrap" class="glass-card" style="display:none; margin-top:10px; padding:12px; text-align:center;">
+                <div id="scanner-reader" style="width:100%; max-width:320px; margin:0 auto; border-radius:12px; overflow:hidden;"></div>
+                <button type="button" id="btn-close-scanner" class="btn-mini btn-mini-red" style="margin-top:10px; padding:6px 16px;">
+                  <i class="fa-solid fa-xmark"></i> Tutup Kamera
+                </button>
               </div>
               <div id="kasir-results" class="kasir-results" role="listbox" hidden></div>
             </div>
-
             <div class="glass-card kasir-cart-card">
               <div class="kasir-cart-head">
                 <span><i class="fa-solid fa-cart-shopping"></i> Keranjang</span>
@@ -1060,12 +1070,15 @@
   <script src="js/role-guard.js?v=2.8"></script>
   <script src="js/config.js?v=2.6"></script>
   <script src="js/validation.js?v=2.6"></script>
-  <script src="js/app.js?v=2.6"></script>
+  <script src="js/app.js?v=4.3"></script>
   <script src="js/features.js?v=2.6"></script>
-  <script src="js/tarik-tunai.js?v=2.6"></script>
+  <script src="js/tarik-tunai.js?v=2.7"></script>
+  <script src="js/tarik-setor-style.js?v=1.0"></script>
+  <script src="js/wa-receipt.js?v=1.0"></script>
+  <script src="js/thermal-print.js?v=1.2"></script>
   <script src="js/kasir.js?v=2.6"></script>
   <script src="js/select-picker.js?v=2.6"></script>
   <script src="js/ledger.js?v=2.6"></script>
-  <script src="js/riwayat.js?v=2.7"></script>
+  <script src="js/riwayat.js?v=3.0"></script>
 </body>
 </html>

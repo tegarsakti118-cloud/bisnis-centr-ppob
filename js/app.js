@@ -79,6 +79,19 @@ async function bootApp() {
     }
     window.nxMe = me;
     if (window.NexoraAuth) NexoraAuth.applyMenu(me);
+    try {
+      const { data: names } = await sb.rpc('nx_staff_names');
+      window.nxStaffNames = names || {};
+    } catch (e) { window.nxStaffNames = {}; }
+    try {
+      const { data: bcfg } = await sb.rpc('nx_my_branch_config');
+      window.nxBranchCfg = bcfg || {};
+    } catch (e) { window.nxBranchCfg = {}; }
+    try {
+      const { data: biz } = await sb.from('businesses').select('name, logo_data').maybeSingle();
+      const { data: br } = await sb.from('branches').select('name, code, address, phone').eq('id', me.branch_id).maybeSingle();
+      window.nxBiz = { name: biz ? biz.name : '', logo: biz ? biz.logo_data : null, branch: br || {} };
+    } catch (e) { window.nxBiz = { name: '', logo: null, branch: {} }; }
   } catch (err) {
     console.error('Gagal memverifikasi akun:', err);
     document.body.classList.remove('auth-pending');
@@ -109,12 +122,44 @@ async function bootApp() {
 function renderUserWidget() {
   const nameEl = document.querySelector('.user-name');
   const roleEl = document.querySelector('.user-role');
-  if (nameEl) nameEl.textContent = currentUserEmail || 'Owner Nexora';
+  const me0 = window.nxMe;
+  if (nameEl) nameEl.textContent = me0 ? (me0.username ? '@' + me0.username : (me0.full_name || 'Pengguna')) : 'Pengguna';
   const me = window.nxMe;
   if (roleEl) {
     roleEl.textContent = me && window.NexoraAuth
       ? NexoraAuth.roleLabel(me.role) + (me.branch_name ? ' · ' + me.branch_name : '')
       : 'Cloud - Terhubung';
+
+    // 1. Tampilkan sisa masa aktif langganan
+    if (me && !document.getElementById('nx-sub-badge')) {
+      const badge = document.createElement('span');
+      badge.id = 'nx-sub-badge';
+
+      const exp = me.subscription_until ? new Date(me.subscription_until) : null;
+      const daysLeft = exp ? Math.ceil((exp - new Date()) / (1000 * 60 * 60 * 24)) : 0;
+      const isUnlimited = me.role === 'super_admin' || daysLeft > 365;
+
+      if (isUnlimited) {
+        // Akun Developer / Super Admin: Tampil Lifetime Access
+        badge.style.cssText = 'display:inline-block; margin-top:4px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);';
+        badge.textContent = '🌟 Lifetime Access';
+      } else {
+        // Akun Klien: Tampil sisa hari & bisa diklik untuk beli promo
+        badge.style.cssText = `display:inline-block; margin-top:4px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; cursor:pointer; ${
+          daysLeft <= 3 ? 'background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.4);' : 'background:rgba(34,197,94,0.15); color:#4ade80; border:1px solid rgba(34,197,94,0.3);'
+        }`;
+        badge.textContent = daysLeft > 0 ? `Aktif: ${daysLeft} hari lagi` : 'Langganan berakhir hari ini';
+        badge.title = 'Klik untuk lihat promo langganan';
+        badge.innerHTML += ' <i class="fa-solid fa-tags" style="font-size:9px; margin-left:3px;"></i>';
+        badge.onclick = (e) => {
+          e.stopPropagation();
+          openSubscriptionUpgradeModal();
+        };
+      }
+      roleEl.insertAdjacentElement('afterend', badge);
+    }
+
+    // 2. Tombol panel admin untuk Super Admin
     if (me && me.role === 'super_admin' && !document.getElementById('nx-admin-link')) {
       const a = document.createElement('a');
       a.id = 'nx-admin-link';
@@ -1076,7 +1121,8 @@ function openAddProductModal() {
     icon: 'fa-solid fa-box',
     submitText: 'Tambah Produk',
     fields: [
-      { id: 'name', label: 'Nama Produk / Barang', type: 'text', required: true, placeholder: 'Contoh: Telkomsel 7GB / 7 Hari' },
+      { id: 'name', label: 'Nama Produk / Barang', type: 'text', required: true, placeholder: 'Contoh: Telkomsel 7GB / Teh Botol' },
+      { id: 'barcode', label: 'Barcode / Kode Barang (Opsional)', type: 'text', placeholder: 'Ketik atau klik tombol scan di samping' },
       { id: 'modal_saldo', label: 'Modal Saldo / Inject Server (Rp)', type: 'number', required: true, allowZero: true, value: '0' },
       { id: 'modal_fisik', label: 'Modal Barang Fisik (Rp)', type: 'number', required: true, allowZero: true, value: '0' },
       { id: 'price', label: 'Harga Jual ke Pelanggan (Rp)', type: 'number', required: true },
@@ -1087,6 +1133,7 @@ function openAddProductModal() {
         id: genId('vouch'),
         user_id: currentUserId,
         name: v.name,
+        barcode: (v.barcode || '').trim() || null,
         modal_saldo: v.modal_saldo,
         modal_fisik: v.modal_fisik,
         price: v.price,
@@ -1099,6 +1146,76 @@ function openAddProductModal() {
       showNotification('Produk kasir berhasil ditambahkan!', 'success');
     }
   });
+
+  // Sisipkan tombol Scan Kamera & wadah kamera khusus di samping kolom barcode
+  setTimeout(() => {
+    const barInput = document.getElementById('fm-barcode');
+    if (!barInput) return;
+
+    // Buat wrapper input + tombol scan kamera
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex; gap:8px; align-items:center; width:100%;';
+    barInput.parentNode.insertBefore(wrap, barInput);
+    wrap.appendChild(barInput);
+
+    const btnScan = document.createElement('button');
+    btnScan.type = 'button';
+    btnScan.className = 'btn-mini btn-mini-blue';
+    btnScan.style.cssText = 'padding:10px 14px; white-space:nowrap; display:flex; align-items:center; gap:6px; font-weight:700;';
+    btnScan.innerHTML = '<i class="fa-solid fa-camera"></i> Scan';
+    wrap.appendChild(btnScan);
+
+    // Wadah kamera scanner di bawah input barcode
+    const camBox = document.createElement('div');
+    camBox.id = 'modal-scanner-wrap';
+    camBox.style.cssText = 'display:none; margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:12px; text-align:center; border:1px solid var(--glass-border);';
+    camBox.innerHTML = `
+      <div id="modal-scanner-view" style="width:100%; max-width:280px; margin:0 auto; border-radius:8px; overflow:hidden;"></div>
+      <button type="button" id="modal-scanner-close" class="btn-mini btn-mini-red" style="margin-top:8px;">Batal Scan</button>
+    `;
+    wrap.parentNode.appendChild(camBox);
+
+    let modalScanner = null;
+
+    const stopModalScanner = async () => {
+      if (modalScanner && modalScanner.isScanning) {
+        await modalScanner.stop();
+      }
+      camBox.style.display = 'none';
+    };
+
+    btnScan.onclick = async () => {
+      if (typeof Html5Qrcode === 'undefined') {
+        showNotification('Library scanner belum siap. Cek koneksi internet.', 'error');
+        return;
+      }
+      camBox.style.display = 'block';
+      if (!modalScanner) modalScanner = new Html5Qrcode('modal-scanner-view');
+
+      try {
+        await modalScanner.start(
+          { facingMode: 'environment' },
+          { fps: 10, qrbox: { width: 240, height: 140 } },
+          (decodedText) => {
+            barInput.value = String(decodedText).trim();
+            showNotification(`Barcode ${decodedText} berhasil di-scan!`, 'success');
+            stopModalScanner();
+          },
+          () => {}
+        );
+      } catch (err) {
+        console.error(err);
+        camBox.style.display = 'none';
+        showNotification('Gagal membuka kamera. Pastikan izin kamera aktif.', 'error');
+      }
+    };
+
+    camBox.querySelector('#modal-scanner-close').onclick = stopModalScanner;
+
+    // Bersihkan kamera jika modal ditutup paksa
+    const cancelBtn = document.getElementById('fm-cancel');
+    if (cancelBtn) cancelBtn.addEventListener('click', stopModalScanner);
+  }, 50);
 }
 
 function updateStock(vouchId) {
@@ -1170,13 +1287,13 @@ function loadDashboardData() {
   };
 
   setText('val-total-modal', formatRupiah(totalSaldo));
-  setText('val-omzet-today', formatRupiah(sumBy(todayTx, 'admin_fee')));
+  setText('val-omzet-today', formatRupiah(sumBy(todayTx, 'amount')));
   // Komisi & fee = pendapatan; biaya admin Pindah Saldo = biaya. Pindah saldo sendiri BUKAN pendapatan.
   const fxDay = (typeof featureTotals === 'function') ? featureTotals('day') : { commission: 0, transferFee: 0 };
   const fxMonth = (typeof featureTotals === 'function') ? featureTotals('month') : { commission: 0, transferFee: 0 };
 
   setText('val-profit-today', formatRupiah(sumBy(todayTx, 'profit') + fxDay.commission - fxDay.transferFee));
-  setText('val-omzet-month', formatRupiah(sumBy(monthTx, 'admin_fee')));
+  setText('val-omzet-month', formatRupiah(sumBy(monthTx, 'amount')));
   setText('val-profit-month', formatRupiah(sumBy(monthTx, 'profit') + fxMonth.commission - fxMonth.transferFee));
   setText('val-commission-today', formatRupiah(fxDay.commission));
   setText('val-commission-month', formatRupiah(fxMonth.commission));
@@ -1227,7 +1344,7 @@ function updateRevenueChart() {
   const totals = keys.map((key) =>
     appData.transactions
       .filter((tx) => localDateKey(tx.date) === key)
-      .reduce((sum, tx) => sum + Number(tx.admin_fee || 0), 0)
+      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
   );
 
   if (revenueChart) {
@@ -1351,48 +1468,175 @@ function printSelectedReceipts() {
   printReceipts(ids);
 }
 
+
+// Struk tampil dulu di layar; dicetak saat tombol Cetak diklik (klik sendiri = pasti diizinkan browser)
+function showReceiptModal(html, list) {
+  let m = document.getElementById('receipt-modal');
+  if (!m) {
+    m = document.createElement('div');
+    m.id = 'receipt-modal';
+    m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;gap:10px;';
+    // Cari baris ini di dalam fungsi showReceiptModal:
+  m.innerHTML = '<iframe id="receipt-frame" style="background:#fff;width:100%;max-width:340px;height:65vh;border:0;border-radius:10px;"></iframe>' +
+    '<div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;">' +
+      '<button id="receipt-wa" type="button" style="width:100%;padding:11px;border-radius:10px;border:0;background:#22c55e;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">' +
+        '<i class="fa-brands fa-whatsapp" style="font-size:16px;"></i> Kirim Struk WhatsApp' +
+      '</button>' +
+      '<div style="display:flex;gap:8px;width:100%;">' +
+        '<button id="receipt-close" type="button" style="flex:1;padding:11px;border-radius:10px;border:1px solid #444;background:#222;color:#fff;cursor:pointer;">Tutup</button>' +
+        '<button id="receipt-print" type="button" style="flex:1;padding:11px;border-radius:10px;border:0;background:#17A897;color:#fff;font-weight:700;cursor:pointer;">Cetak / PDF</button>' +
+      '</div>' +
+    '</div>';
+  document.body.appendChild(m);
+  m.querySelector('#receipt-close').onclick = () => m.remove();
+
+  // Tambahkan listener ini tepat di bawah m.querySelector('#receipt-close'):
+  const btnWa = m.querySelector('#receipt-wa');
+  if (btnWa) {
+    btnWa.onclick = () => {
+      const ids = (list || []).map(t => t.id);
+      if (window.NxWhatsApp) window.NxWhatsApp.sendReceiptWA(ids);
+    };
+  }document.body.appendChild(m);
+    m.querySelector('#receipt-close').onclick = () => m.remove();
+  }
+  const frame = m.querySelector('#receipt-frame');
+  frame.srcdoc = html;
+
+  // Area Bluetooth selalu tampil: berisi tombol, atau pesan penyebab yang tidak bisa dipakai
+  let bt = m.querySelector('#receipt-bt');
+  if (bt) bt.remove();
+  bt = document.createElement('div');
+  bt.id = 'receipt-bt';
+  bt.style.cssText = 'display:flex;flex-direction:column;gap:6px;width:100%;max-width:340px;';
+  const note = (t) => `<div style="font-size:11px;color:#fbbf24;background:#1f2937;border-radius:8px;padding:8px;line-height:1.4;">${t}</div>`;
+  if (!window.NxThermal) {
+    bt.innerHTML = note('Modul printer Bluetooth belum termuat. Pastikan file js/thermal-print.js ada di folder js, lalu muat ulang halaman.');
+  } else if (!NxThermal.supported()) {
+    bt.innerHTML = note('Bluetooth tidak tersedia di browser ini (secure: ' + (window.isSecureContext ? 'ya' : 'tidak') + '). Buka aplikasi lewat Google Chrome, bukan browser lain atau aplikasi di dalam aplikasi.');
+  } else {
+    bt.innerHTML = '<div style="display:flex;gap:8px;">' +
+      '<button id="bt-connect" type="button" style="flex:1;padding:10px;border-radius:10px;border:1px solid #2563eb;background:#111827;color:#93c5fd;font-size:12px;">Hubungkan Printer</button>' +
+      '<button id="bt-print" type="button" style="flex:1;padding:10px;border-radius:10px;border:0;background:#2563eb;color:#fff;font-size:12px;font-weight:700;">Cetak Bluetooth</button></div>';
+  }
+  const btRow = m.querySelector('#receipt-close').parentElement;
+  m.insertBefore(bt, btRow);
+  const ctx = { biz: window.nxBiz || {}, br: (window.nxBiz || {}).branch || {}, names: window.nxStaffNames || {}, me: window.nxMe || {} };
+  const bc = bt.querySelector('#bt-connect'), bp = bt.querySelector('#bt-print');
+  if (bc) bc.onclick = async () => {
+    try {
+      const name = await NxThermal.connect();
+      showNotification('Terhubung ke ' + name, 'success');
+    } catch (e) { showNotification(e.message || 'Gagal menghubungkan printer.', 'error'); }
+  };
+  if (bp) bp.onclick = async () => {
+    try {
+      if (!NxThermal.isConnected()) { showNotification('Hubungkan printer dulu.', 'error'); return; }
+      await NxThermal.printReceipts(list || [], ctx);
+      showNotification('Struk dikirim ke printer.', 'success');
+    } catch (e) { showNotification(e.message || 'Gagal mencetak.', 'error'); }
+  };
+  m.querySelector('#receipt-print').onclick = () => {
+    try {
+      frame.contentWindow.focus();
+      frame.contentWindow.print();
+    } catch (e) {
+      showNotification('Gagal membuka dialog cetak. Coba lagi.', 'error');
+    }
+  };
+}
+
 function printReceipts(ids) {
   const list = ids
     .map((id) => appData.transactions.find((t) => String(t.id) === String(id)))
     .filter(Boolean);
-  if (list.length === 0) return;
-
-  const total = list.reduce((sum, tx) => sum + Number(tx.admin_fee || 0), 0);
-  const rows = list.map((tx) => `
-    <div class="item">
-      <div class="id">${escapeHtml(String(tx.id).toUpperCase())}</div>
-      <div>${escapeHtml(new Date(tx.date).toLocaleString('id-ID'))}</div>
-      <div>${escapeHtml(tx.notes)}</div>
-      <div class="line"><span>${tx.status === 'Hutang' ? 'HUTANG' : 'LUNAS'}</span><strong>${formatRupiah(tx.admin_fee)}</strong></div>
-    </div>`).join('');
-
-  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Struk Nexora</title>
-    <style>
-      body { font-family: 'Courier New', monospace; font-size: 12px; width: 280px; margin: 0 auto; padding: 10px; color: #000; }
-      h2 { text-align: center; margin: 0 0 2px; font-size: 16px; }
-      .sub { text-align: center; font-size: 10px; margin-bottom: 8px; }
-      .item { border-top: 1px dashed #000; padding: 6px 0; }
-      .id { font-weight: bold; }
-      .line { display: flex; justify-content: space-between; margin-top: 2px; }
-      .total { border-top: 2px solid #000; padding-top: 6px; display: flex; justify-content: space-between; font-size: 14px; font-weight: bold; }
-      .foot { text-align: center; margin-top: 10px; font-size: 10px; }
-    </style></head><body>
-      <h2>Nexora</h2><div class="sub">Business Center</div>
-      ${rows}
-      <div class="total"><span>TOTAL</span><span>${formatRupiah(total)}</span></div>
-      <div class="foot">Terima kasih</div>
-    </body></html>`;
-
-  const w = window.open('', '_blank', 'width=380,height=640');
-  if (!w) {
-    showNotification('Pop-up diblokir browser. Izinkan pop-up untuk mencetak struk.', 'error');
+  if (list.length === 0) {
+    showNotification('Transaksi tidak ditemukan. Muat ulang halaman lalu coba lagi.', 'error');
     return;
   }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 300);
+
+  const biz = window.nxBiz || {};
+  const br = biz.branch || {};
+  const names = window.nxStaffNames || {};
+  const me = window.nxMe || {};
+  const fmtDT = (d) => new Date(d).toLocaleString('en-GB', {
+    timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
+  });
+  // admin_fee = harga jual yang dibayar pelanggan (dasar omzet). amount = modal internal, TIDAK ditampilkan.
+  const totalBayar = list.reduce((s, tx) => s + Number(tx.admin_fee || 0), 0);
+  const allLunas = list.every((tx) => tx.status !== 'Hutang');
+  const branchLine = [br.name, br.code ? '(' + br.code + ')' : ''].filter(Boolean).join(' ');
+
+  const row = (label, value, cls) =>
+    `<div class="rw"><span class="lb">${escapeHtml(label)}</span><span class="vl ${cls || ''}">${value}</span></div>`;
+
+  const items = list.map((tx) => {
+    const kasir = (tx.user_id && names[String(tx.user_id)]) || me.full_name || '-';
+    const hutang = tx.status === 'Hutang';
+    const acc = (typeof findAccount === 'function' && findAccount(tx.accountId)) || null;
+    const isVoucher = tx.type === 'voucher';
+    const common = `
+    <div class="sep"></div>
+    ${row('No. Struk', escapeHtml(String(tx.id).toUpperCase()), 'mono')}
+    ${row('Waktu', escapeHtml(fmtDT(tx.date)))}
+    ${row('Kasir', escapeHtml(kasir))}`;
+    const detail = isVoucher
+      ? `${row('Produk', escapeHtml(tx.notes || '-'))}
+    ${tx.quantity ? row('Jumlah', String(tx.quantity)) : ''}
+    ${row('Harga', formatRupiah(tx.admin_fee))}`
+      : `${row('Layanan', escapeHtml(tx.notes || '-'))}
+    ${acc ? row('Rekening', escapeHtml(acc.name)) : ''}
+    ${row('Nominal', formatRupiah(tx.amount))}
+    ${row('Biaya Admin', formatRupiah(Number(tx.admin_fee || 0) - Number(tx.amount || 0)))}`;
+    return `${common}
+    ${detail}
+    <div class="rw"><span class="lb">Status</span><span class="badge ${hutang ? 'bh' : 'bl'}">${hutang ? 'HUTANG / BELUM LUNAS' : 'LUNAS / BERHASIL'}</span></div>`;
+  }).join('');
+
+  const html = `<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Struk ${escapeHtml(biz.name || 'Nexora')}</title>
+    <style>
+      *{box-sizing:border-box}
+      body{font-family:'Courier New',Courier,monospace;font-size:12px;width:300px;margin:0 auto;padding:14px 12px;color:#111;background:#fff}
+      .head{text-align:center}
+      .logo{max-width:80px;max-height:56px;margin-bottom:6px}
+      .biz{font-size:18px;font-weight:700;letter-spacing:1px;text-transform:uppercase}
+      .sub{font-size:11px;color:#444;margin-top:3px}
+      .sep{border-top:1px dashed #888;margin:8px 0}
+      .rw{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin:4px 0;line-height:1.35}
+      .lb{color:#555;flex-shrink:0}
+      .vl{text-align:right;word-break:break-word}
+      .mono{font-weight:700}
+      .badge{display:inline-block;padding:3px 8px;border-radius:6px;font-weight:700;font-size:11px;text-align:center;max-width:170px;line-height:1.3}
+      .bl{background:#dcfce7;color:#15803d;border:1px solid #86efac}
+      .bh{background:#fef3c7;color:#b45309;border:1px solid #fcd34d}
+      .total{border-top:2px solid #111;border-bottom:2px solid #111;margin:10px 0 8px;padding:8px 0}
+      .total .rw{font-size:15px;font-weight:700;margin:2px 0}
+      .foot{text-align:center;margin-top:10px;font-size:11px;color:#333;line-height:1.5}
+      .foot .ty{font-weight:700;letter-spacing:2px;margin-bottom:4px}
+      .dot{border-top:1px dotted #aaa;margin:10px 0 6px}
+      .made{text-align:center;font-size:10px;color:#666}
+    </style></head><body>
+      <div class="head">
+        ${biz.logo ? `<img class="logo" src="${escapeHtml(biz.logo)}" alt="">` : ''}
+        <div class="biz">${escapeHtml(biz.name || 'Nexora')}</div>
+        ${branchLine ? `<div class="sub">${escapeHtml(branchLine)}</div>` : ''}
+        ${br.address ? `<div class="sub">${escapeHtml(br.address)}</div>` : ''}
+        ${br.phone ? `<div class="sub">Telp/WA: ${escapeHtml(br.phone)}</div>` : ''}
+      </div>
+      ${items}
+      <div class="sep"></div>
+      <div class="total">
+        <div class="rw"><span>TOTAL BAYAR</span><span>${formatRupiah(totalBayar)}</span></div>
+        ${list.length > 1 ? row('Jumlah struk', String(list.length)) : ''}
+      </div>
+      <div class="foot">
+        <div class="ty">*** TERIMA KASIH ***</div>
+        Simpan struk ini sebagai bukti pembayaran yang sah.
+      </div>
+      <div class="dot"></div>
+      <div class="made">Dicetak ${escapeHtml(fmtDT(new Date()))}<br>Dibuat dengan Nexora</div>
+    </body></html>`;
+  showReceiptModal(html, list);
 }
 
 // ==========================================
@@ -1425,7 +1669,9 @@ function exportTransactionsExcel(mode) {
       'Aplikasi': acc ? acc.name : '-',
       'Keterangan': tx.notes,
       'Status': tx.status,
-      'Penjualan': Number(tx.admin_fee || 0),
+      'Nominal': Number(tx.amount || 0),
+      'Biaya Admin': tx.type === 'tarik_setor' ? Number(tx.admin_fee || 0) - Number(tx.amount || 0) : 0,
+      'Total': Number(tx.admin_fee || 0),
       'Modal': Number(tx.cost_price !== null && tx.cost_price !== undefined ? tx.cost_price : tx.amount || 0),
       'Keuntungan': Number(tx.profit || 0),
       // Kolom tambahan Tarik Tunai (kosong untuk transaksi lain)
@@ -1435,7 +1681,9 @@ function exportTransactionsExcel(mode) {
 
   rows.push({
     'ID': 'TOTAL', 'Tanggal': '', 'Layanan': '', 'Aplikasi': '', 'Keterangan': '', 'Status': '',
-    'Penjualan': rows.reduce((s, r) => s + r['Penjualan'], 0),
+    'Nominal': rows.reduce((s, r) => s + r['Nominal'], 0),
+    'Biaya Admin': rows.reduce((s, r) => s + r['Biaya Admin'], 0),
+    'Total': rows.reduce((s, r) => s + r['Total'], 0),
     'Modal': rows.reduce((s, r) => s + r['Modal'], 0),
     'Keuntungan': rows.reduce((s, r) => s + r['Keuntungan'], 0)
   });
@@ -1651,6 +1899,28 @@ function openPayDebtModal(customerKey) {
 // BALANCE MANAGEMENT
 // ==========================================
 
+function canDeleteAccounts() {
+  const me = window.nxMe;
+  if (!me) return false;
+  if (me.role === 'super_admin') return true;
+  return !(me.perms && me.perms.kelola_saldo === false);
+}
+
+function deleteAccountById(accId) {
+  const acc = findAccount(accId);
+  if (!acc) return;
+  showConfirm('Hapus Rekening', `Hapus rekening "${acc.name}"? Hanya bisa jika saldo 0 dan belum pernah dipakai.`, async () => {
+    const { error } = await sb.rpc('nx_delete_account', { p_account_id: String(accId) });
+    if (error) {
+      showNotification(error.message || 'Gagal menghapus rekening.', 'error');
+      return;
+    }
+    appData.accounts = appData.accounts.filter((a) => String(a.id) !== String(accId));
+    loadBalancePage();
+    showNotification('Rekening dihapus.', 'success');
+  });
+}
+
 function loadBalancePage() {
   const gridEl = document.getElementById('accounts-grid');
   const selectEl = document.getElementById('adj-account-id');
@@ -1661,7 +1931,10 @@ function loadBalancePage() {
   } else {
     gridEl.innerHTML = appData.accounts.map((acc) => `
       <div class="metric-card glass-card">
-        <div class="metric-header"><span>${escapeHtml(acc.name)}</span></div>
+        <div class="metric-header" style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <span>${escapeHtml(acc.name)}</span>
+          ${canDeleteAccounts() ? `<button type="button" class="btn-mini btn-mini-red" onclick="deleteAccountById('${escapeHtml(acc.id)}')" title="Hapus Rekening"><i class="fa-solid fa-trash-can"></i></button>` : ''}
+        </div>
         <h3 class="metric-value">${formatRupiah(acc.balance)}</h3>
       </div>
     `).join('');
@@ -1901,3 +2174,71 @@ function deleteCustomer(customerId) {
     showNotification('Pelanggan dihapus!', 'success');
   }, true);
 }
+// ==========================================
+// POP-UP PROMO PAKET HARGA CORET VIA WHATSAPP
+// ==========================================
+function openSubscriptionUpgradeModal() {
+  const me = window.nxMe || {};
+  const biz = window.nxBiz || {};
+  const packages = (window.NexoraAuth && window.NexoraAuth.PRICING_PACKAGES) || [];
+
+  const pkgCards = packages.map((pkg) => `
+    <div style="padding:14px; border:1px solid rgba(255,255,255,0.1); border-radius:12px; background:rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div>
+        <div style="display:flex; align-items:center; gap:6px;">
+          <strong style="font-size:13px; color:#fff;">${pkg.name}</strong>
+          ${pkg.badge ? `<span style="font-size:9px; font-weight:700; background:rgba(248,113,113,0.2); color:#f87171; border:1px solid rgba(248,113,113,0.3); padding:1px 6px; border-radius:999px;">${pkg.badge}</span>` : ''}
+        </div>
+        <span style="font-size:11px; color:#94a3b8; display:block; margin-top:2px;">${pkg.label}</span>
+      </div>
+      <div style="text-align:right;">
+        ${pkg.originalPrice ? `<span style="font-size:11px; color:#64748b; text-decoration:line-through; display:block;">${pkg.originalPrice}</span>` : ''}
+        <span style="font-size:16px; font-weight:800; color:#34d399; display:block;">${pkg.price}</span>
+        <button type="button" onclick="checkoutViaWA('${pkg.name}', '${pkg.price}')" class="btn-mini btn-mini-green" style="margin-top:4px; padding:6px 12px; border-radius:8px; cursor:pointer;">
+          Pilih Promo
+        </button>
+      </div>
+    </div>
+  `).join('');
+
+  const modal = createModal('sub-upgrade-modal', `
+    <div class="app-modal-head" style="color:#fbbf24;">
+      <i class="fa-solid fa-crown" style="font-size:22px;"></i>
+      <h3>Promo Perpanjang Layanan</h3>
+    </div>
+    <p class="app-modal-text" style="margin-bottom:14px;">
+      Pilih paket promo langganan untuk menjaga seluruh fitur kasir, mutasi, dan pembukuan tetap aktif:
+    </p>
+    <div style="display:flex; flex-direction:column; gap:10px; margin-bottom:16px;">
+      ${pkgCards}
+    </div>
+    <div class="app-modal-actions">
+      <button type="button" id="sub-modal-close" class="app-btn-ghost" style="width:100%;">Tutup</button>
+    </div>
+  `, 'rgba(251,191,36,0.4)');
+
+  modal.querySelector('#sub-modal-close').onclick = () => modal.remove();
+}
+
+function checkoutViaWA(pkgName, price) {
+  const me = window.nxMe || {};
+  const biz = window.nxBiz || {};
+  const wa = (window.NexoraAuth && window.NexoraAuth.DEVELOPER_WA) || '6281234567890';
+  const bizName = biz.name || me.branch_name || 'Bisnis Saya';
+  const username = me.username || me.full_name || '-';
+
+  // Format pesan WA otomatis
+  const msg = `Halo Admin Nexora, saya ingin ambil PROMO perpanjang aplikasi kasir:\n\n` +
+    `*Nama Bisnis:* ${bizName}\n` +
+    `*Username Akun:* @${username}\n` +
+    `*Paket Dipilih:* ${pkgName}\n` +
+    `*Harga Promo:* ${price}\n\n` +
+    `Mohon info rekening/QRIS pembayarannya ya. Terima kasih!`;
+
+  const url = `https://api.whatsapp.com/send?phone=${wa}&text=${encodeURIComponent(msg)}`;
+  removeModal('sub-upgrade-modal');
+  window.open(url, '_blank');
+}
+
+window.openSubscriptionUpgradeModal = openSubscriptionUpgradeModal;
+window.checkoutViaWA = checkoutViaWA;

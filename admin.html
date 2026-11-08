@@ -11,6 +11,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/supabase.js"></script>
   <script src="js/auth-ui.js"></script>
@@ -23,10 +24,12 @@
     .sidebar-item.active { background: #17A897; color: #ffffff; font-weight: 600; }
   </style>
 </head>
-<body class="min-h-screen flex flex-col md:flex-row">
+<body class="min-h-screen">
+  <div class="flex min-h-screen">
+  <div id="sidebar-overlay" onclick="toggleAdminSidebar(false)" class="hidden fixed inset-0 bg-black/60 z-40 md:hidden"></div>
 
   <!-- SIDEBAR NAVIGATION -->
-  <aside class="w-full md:w-64 bg-[#161b22] border-r border-[#30363d] p-4 flex flex-col justify-between shrink-0">
+  <aside id="admin-sidebar" class="fixed md:sticky top-0 left-0 h-screen w-72 md:w-64 z-50 -translate-x-full md:translate-x-0 transition-transform duration-200 bg-[#161b22] border-r border-[#30363d] p-4 flex flex-col justify-between overflow-y-auto shrink-0">
     <div>
       <div class="flex items-center gap-3 px-3 py-4 mb-4 border-b border-[#30363d]">
         <img src="img/nexora-logo.png" alt="Nexora Logo" class="h-8 w-auto" onerror="this.src='https://via.placeholder.com/32?text=N';">
@@ -54,6 +57,15 @@
         <button onclick="switchAdminTab('monitoring')" id="nav-monitoring" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
           <i class="fa-solid fa-receipt text-sm"></i> Monitoring Transaksi
         </button>
+        <button onclick="switchAdminTab('finance')" id="nav-finance" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-chart-column text-sm"></i> Laporan Keuangan
+        </button>
+        <button onclick="switchAdminTab('config')" id="nav-config" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-sliders text-sm"></i> Konfigurasi Aplikasi
+        </button>
+        <button onclick="switchAdminTab('settings')" id="nav-settings" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
+          <i class="fa-solid fa-gear text-sm"></i> Pengaturan
+        </button>
         <button onclick="switchAdminTab('audit')" id="nav-audit" class="sidebar-item w-full flex items-center gap-3 px-4 py-3 rounded-xl text-xs text-[#8b949e] hover:bg-[#21262d] transition">
           <i class="fa-solid fa-shield-halved text-sm"></i> Audit Log System
         </button>
@@ -73,8 +85,23 @@
     </div>
   </aside>
 
+  <div class="flex-1 min-w-0 flex flex-col">
+  <header class="sticky top-0 z-30 bg-[#0d1117]/95 backdrop-blur border-b border-[#30363d] px-4 md:px-6 py-3 flex items-center gap-3">
+    <button onclick="toggleAdminSidebar(true)" class="md:hidden w-10 h-10 shrink-0 rounded-xl border border-[#30363d] text-white" aria-label="Menu">
+      <i class="fa-solid fa-bars"></i>
+    </button>
+    <div class="min-w-0 flex-1">
+      <p id="nav-title" class="text-sm font-bold text-white truncate">Executive Summary</p>
+      <p id="nav-subtitle" class="text-[10px] text-[#8b949e] truncate">Nexora HQ · Super Admin</p>
+    </div>
+    <span id="nav-username" class="hidden sm:inline text-xs text-[#8b949e] truncate max-w-[180px]"></span>
+    <button onclick="handleLogout()" class="w-10 h-10 shrink-0 rounded-xl border border-red-500/30 text-red-400" title="Keluar" aria-label="Keluar">
+      <i class="fa-solid fa-right-from-bracket"></i>
+    </button>
+  </header>
+
   <!-- MAIN CONTENT AREA -->
-  <main class="flex-1 p-6 overflow-y-auto">
+  <main class="flex-1 min-w-0 p-4 md:p-6">
 
     <!-- TAB 1: EXECUTIVE SUMMARY -->
     <section id="tab-overview" class="space-y-6">
@@ -141,6 +168,7 @@
         </select>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Pendapatan Admin</span><h3 class="text-xl font-bold text-[#17A897] mt-1" id="metric-pendapatan-admin">Rp 0</h3><span class="text-[10px] text-[#8b949e]">Tarik Tunai, Setor, Topup</span></div>
         <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Cabang Nonaktif</span><h3 class="text-xl font-bold text-red-400 mt-1" id="dash-inactive">0</h3></div>
         <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Total Karyawan</span><h3 class="text-xl font-bold text-white mt-1" id="dash-employees">0</h3></div>
         <div class="glass-card p-4"><span class="text-xs text-[#8b949e]">Total Transaksi</span><h3 class="text-xl font-bold text-white mt-1" id="dash-tx">0</h3></div>
@@ -210,64 +238,63 @@
     <!-- TAB 4: KONTROL SALDO HQ -->
     <section id="tab-balances" class="hidden space-y-6">
       <div>
-        <h2 class="text-xl font-bold text-white">Kontrol & Transfer Saldo HQ</h2>
-        <p class="text-xs text-[#8b949e]">Manajemen saldo atomik antar cabang dengan audit log otomatis.</p>
+        <h2 class="text-xl font-bold text-white">Manajemen Saldo Rekening</h2>
+        <p class="text-xs text-[#8b949e]">Saldo yang diubah di sini adalah saldo rekening (BRI, DANA, Kas Laci, dan seterusnya). Dashboard membaca angka yang sama.</p>
       </div>
       <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <!-- PENYESUAIAN SALDO -->
-        <div class="glass-card p-5 space-y-4">
-          <h3 class="text-sm font-bold text-white">Penyesuaian Saldo Cabang</h3>
-          <div class="space-y-3">
-            <div>
-              <label class="text-xs text-[#8b949e]">Cabang Target</label>
-              <select id="adj-branch-id" class="glass-input text-xs w-full mt-1"></select>
-            </div>
-            <div>
-              <label class="text-xs text-[#8b949e]">Aksi Saldo</label>
-              <select id="adj-type" class="glass-input text-xs w-full mt-1">
-                <option value="add">Tambah Saldo (+) [Topup]</option>
-                <option value="subtract">Kurangi Saldo (-) [Penarikan]</option>
-              </select>
-            </div>
-            <div>
-              <label class="text-xs text-[#8b949e]">Nominal (Rp)</label>
-              <input type="number" id="adj-amount" placeholder="0" class="glass-input text-xs w-full mt-1">
-            </div>
-            <div>
-              <label class="text-xs text-[#8b949e]">Alasan Penyesuaian</label>
-              <input type="text" id="adj-reason" placeholder="Contoh: Setoran modal HQ" class="glass-input text-xs w-full mt-1">
-            </div>
-            <button onclick="processBalanceAdjustment()" class="w-full py-3 bg-[#17A897] text-white font-semibold rounded-xl text-xs hover:opacity-90">
-              Eksekusi Penyesuaian Saldo
-            </button>
-          </div>
+        <div class="glass-card p-5 space-y-3">
+          <h3 class="text-sm font-bold text-white">Tambah / Kurangi Saldo Rekening</h3>
+          <div><label class="text-xs text-[#8b949e]">Cabang</label>
+            <select id="adj-branch" class="glass-input text-xs w-full mt-1" onchange="fillAccountSelect('adj-branch','adj-account')"></select></div>
+          <div><label class="text-xs text-[#8b949e]">Rekening</label>
+            <select id="adj-account" class="glass-input text-xs w-full mt-1"></select></div>
+          <div><label class="text-xs text-[#8b949e]">Aksi</label>
+            <select id="adj-type" class="glass-input text-xs w-full mt-1">
+              <option value="add">Tambah saldo (+)</option>
+              <option value="subtract">Kurangi saldo (-)</option>
+            </select></div>
+          <div><label class="text-xs text-[#8b949e]">Nominal (Rp)</label>
+            <input type="number" id="adj-amount" min="1" placeholder="0" class="glass-input text-xs w-full mt-1"></div>
+          <div><label class="text-xs text-[#8b949e]">Keterangan</label>
+            <input type="text" id="adj-reason" placeholder="Contoh: Setoran modal HQ" class="glass-input text-xs w-full mt-1"></div>
+          <button onclick="processBalanceAdjustment()" class="w-full py-3 bg-[#17A897] text-white font-semibold rounded-xl text-xs hover:opacity-90">Eksekusi</button>
         </div>
+        <div class="glass-card p-5 space-y-3">
+          <h3 class="text-sm font-bold text-white">Transfer Saldo Antar Rekening</h3>
+          <div><label class="text-xs text-[#8b949e]">Cabang Sumber</label>
+            <select id="trf-from-branch" class="glass-input text-xs w-full mt-1" onchange="fillAccountSelect('trf-from-branch','trf-from-account')"></select></div>
+          <div><label class="text-xs text-[#8b949e]">Rekening Sumber</label>
+            <select id="trf-from-account" class="glass-input text-xs w-full mt-1"></select></div>
+          <div><label class="text-xs text-[#8b949e]">Cabang Tujuan</label>
+            <select id="trf-to-branch" class="glass-input text-xs w-full mt-1" onchange="fillAccountSelect('trf-to-branch','trf-to-account')"></select></div>
+          <div><label class="text-xs text-[#8b949e]">Rekening Tujuan</label>
+            <select id="trf-to-account" class="glass-input text-xs w-full mt-1"></select></div>
+          <div><label class="text-xs text-[#8b949e]">Nominal (Rp)</label>
+            <input type="number" id="trf-amount" min="1" placeholder="0" class="glass-input text-xs w-full mt-1"></div>
+          <div><label class="text-xs text-[#8b949e]">Keterangan</label>
+            <input type="text" id="trf-notes" placeholder="Contoh: Pindah ke BRI" class="glass-input text-xs w-full mt-1"></div>
+          <button onclick="processBranchTransfer()" class="w-full py-3 bg-sky-600 text-white font-semibold rounded-xl text-xs hover:opacity-90">Transfer</button>
+        </div>
+      </div>
 
-        <!-- TRANSFER SALDO ANTAR CABANG -->
-        <div class="glass-card p-5 space-y-4">
-          <h3 class="text-sm font-bold text-white">Transfer Saldo Antar Cabang</h3>
-          <div class="space-y-3">
-            <div>
-              <label class="text-xs text-[#8b949e]">Cabang Pengirim (Sumber)</label>
-              <select id="trf-from-branch" class="glass-input text-xs w-full mt-1"></select>
-            </div>
-            <div>
-              <label class="text-xs text-[#8b949e]">Cabang Penerima (Tujuan)</label>
-              <select id="trf-to-branch" class="glass-input text-xs w-full mt-1"></select>
-            </div>
-            <div>
-              <label class="text-xs text-[#8b949e]">Nominal Transfer (Rp)</label>
-              <input type="number" id="trf-amount" placeholder="0" class="glass-input text-xs w-full mt-1">
-            </div>
-            <div>
-              <label class="text-xs text-[#8b949e]">Catatan / Referensi</label>
-              <input type="text" id="trf-notes" placeholder="Contoh: Perimbangan saldo antar unit" class="glass-input text-xs w-full mt-1">
-            </div>
-            <button onclick="processBranchTransfer()" class="w-full py-3 bg-sky-600 text-white font-semibold rounded-xl text-xs hover:opacity-90">
-              Transfer Saldo Atomik
-            </button>
-          </div>
-        </div>
+      <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+        <div class="p-4 text-sm font-bold text-white">Saldo Rekening Saat Ini</div>
+        <table class="w-full min-w-[560px] text-left text-xs">
+          <thead class="text-[#8b949e] border-b border-[#30363d]">
+            <tr><th class="p-3">Cabang</th><th class="p-3">Rekening</th><th class="p-3">Tipe</th><th class="p-3 text-right">Saldo</th></tr>
+          </thead>
+          <tbody id="acc-balance-body"></tbody>
+        </table>
+      </div>
+
+      <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+        <div class="p-4 text-sm font-bold text-white">Riwayat Mutasi Rekening <span class="text-[10px] font-normal text-[#8b949e]">(100 terakhir, seluruh cabang)</span></div>
+        <table class="w-full min-w-[900px] text-left text-xs">
+          <thead class="text-[#8b949e] border-b border-[#30363d]">
+            <tr><th class="p-3">Waktu</th><th class="p-3">Cabang</th><th class="p-3">Rekening</th><th class="p-3">Jenis</th><th class="p-3">Nominal</th><th class="p-3">Saldo</th><th class="p-3">Keterangan</th><th class="p-3">Oleh</th></tr>
+          </thead>
+          <tbody id="bal-ledger-body"></tbody>
+        </table>
       </div>
     </section>
 
@@ -287,7 +314,7 @@
           <thead class="bg-[#21262d] text-[#8b949e]">
             <tr>
               <th class="p-4">Nama User</th>
-              <th class="p-4">Email</th>
+              <th class="p-4">Username</th>
               <th class="p-4">Role</th>
               <th class="p-4">Cabang Penempatan</th>
               <th class="p-4">Status</th>
@@ -303,42 +330,168 @@
 
     <!-- TAB 6: MONITORING TRANSAKSI -->
     <section id="tab-monitoring" class="hidden space-y-6">
-      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 class="text-xl font-bold text-white">Monitoring Transaksi Global</h2>
-          <p class="text-xs text-[#8b949e]">Pantau seluruh aktivitas transaksi dari semua unit cabang.</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <select id="mon-filter-branch" onchange="loadGlobalTransactions()" class="glass-input text-xs">
-            <option value="all">Semua Cabang</option>
-          </select>
-          <button onclick="loadGlobalTransactions()" class="px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold hover:opacity-90">
-            Refresh Filter
-          </button>
+      <div>
+        <h2 class="text-xl font-bold text-white">Monitoring Transaksi Seluruh Cabang</h2>
+        <p class="text-xs text-[#8b949e]">Semua transaksi di bisnis Anda. Klik baris untuk melihat detail dan riwayat perubahan.</p>
+      </div>
+      <div class="glass-card p-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div><label class="text-[10px] text-[#8b949e]">Dari tanggal</label><input type="date" id="mon-from" class="glass-input text-xs w-full mt-1"></div>
+        <div><label class="text-[10px] text-[#8b949e]">Sampai tanggal</label><input type="date" id="mon-to" class="glass-input text-xs w-full mt-1"></div>
+        <div><label class="text-[10px] text-[#8b949e]">Cabang</label><select id="mon-filter-branch" class="glass-input text-xs w-full mt-1"><option value="all">Semua Cabang</option></select></div>
+        <div><label class="text-[10px] text-[#8b949e]">Karyawan</label><select id="mon-filter-staff" class="glass-input text-xs w-full mt-1"><option value="all">Semua Karyawan</option></select></div>
+        <div><label class="text-[10px] text-[#8b949e]">Jenis</label><select id="mon-filter-type" class="glass-input text-xs w-full mt-1"><option value="all">Semua Jenis</option></select></div>
+        <div><label class="text-[10px] text-[#8b949e]">Status</label><select id="mon-filter-status" class="glass-input text-xs w-full mt-1"><option value="all">Semua Status</option></select></div>
+        <div class="md:col-span-2"><label class="text-[10px] text-[#8b949e]">Cari pelanggan, ID, atau keterangan</label><input type="text" id="mon-search" placeholder="Ketik lalu Terapkan" class="glass-input text-xs w-full mt-1"></div>
+        <div class="md:col-span-4 flex flex-wrap gap-2 items-center justify-between">
+          <span id="mon-count" class="text-[11px] text-[#8b949e]"></span>
+          <div class="flex gap-2">
+            <button onclick="loadGlobalTransactions()" class="px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold">Terapkan</button>
+            <button onclick="exportMonitoringExcel()" class="px-4 py-2 bg-emerald-700 text-white rounded-xl text-xs font-semibold">Ekspor Excel</button>
+          </div>
         </div>
       </div>
       <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
-        <table class="w-full min-w-[760px] text-left text-xs">
+        <table class="w-full min-w-[980px] text-left text-xs">
           <thead class="bg-[#21262d] text-[#8b949e]">
             <tr>
-              <th class="p-4">ID Transaksi</th>
-              <th class="p-4">Waktu</th>
-              <th class="p-4">Cabang</th>
-              <th class="p-4">Tipe / Layanan</th>
-              <th class="p-4">Keterangan</th>
-              <th class="p-4 text-right">Nominal</th>
-              <th class="p-4 text-right">Biaya / Profit</th>
-              <th class="p-4">Status</th>
+              <th class="p-3">ID</th><th class="p-3">Waktu</th><th class="p-3">Cabang</th><th class="p-3">Karyawan</th>
+              <th class="p-3">Jenis</th><th class="p-3">Pelanggan / Keterangan</th><th class="p-3 text-right">Nominal</th>
+              <th class="p-3 text-right">Biaya Admin</th><th class="p-3 text-right">Profit</th><th class="p-3">Status</th><th class="p-3">Edit</th>
             </tr>
           </thead>
           <tbody id="global-tx-table-body" class="divide-y divide-[#30363d]">
-            <tr><td colspan="8" class="p-4 text-center text-[#8b949e]">Memuat data transaksi...</td></tr>
+            <tr><td colspan="11" class="p-4 text-center text-[#8b949e]">Memuat data transaksi...</td></tr>
           </tbody>
         </table>
       </div>
     </section>
 
+    <div id="modal-tx-detail" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+      <div class="glass-card p-5 w-full max-w-lg space-y-3 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center">
+          <h3 class="text-base font-bold text-white">Detail Transaksi</h3>
+          <button onclick="closeTxDetail()" class="text-[#8b949e] text-lg">&times;</button>
+        </div>
+        <div id="tx-detail-body" class="text-xs text-white space-y-1"></div>
+        <h4 class="text-sm font-bold text-white pt-2">Riwayat Perubahan</h4>
+        <div id="tx-history-body" class="text-xs text-[#8b949e] space-y-2"></div>
+      </div>
+    </div>
+
     <!-- TAB 7: AUDIT LOG -->
+    <section id="tab-finance" class="hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white">Laporan Keuangan Seluruh Cabang</h2>
+        <p class="text-xs text-[#8b949e]">Dihitung dari data transaksi dan mutasi rekening. Transfer antar rekening tidak dihitung sebagai pemasukan atau pengeluaran.</p>
+      </div>
+      <div class="glass-card p-4 space-y-3">
+        <div class="flex flex-wrap gap-2" id="fin-presets">
+          <button onclick="finPreset('today')" class="px-3 py-1.5 rounded-full border border-[#30363d] text-xs text-white">Hari ini</button>
+          <button onclick="finPreset('yesterday')" class="px-3 py-1.5 rounded-full border border-[#30363d] text-xs text-white">Kemarin</button>
+          <button onclick="finPreset('7d')" class="px-3 py-1.5 rounded-full border border-[#30363d] text-xs text-white">7 hari</button>
+          <button onclick="finPreset('30d')" class="px-3 py-1.5 rounded-full border border-[#30363d] text-xs text-white">30 hari</button>
+          <button onclick="finPreset('month')" class="px-3 py-1.5 rounded-full border border-[#30363d] text-xs text-white">Bulan ini</button>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div><label class="text-[10px] text-[#8b949e]">Dari</label><input type="date" id="fin-from" class="glass-input text-xs w-full mt-1"></div>
+          <div><label class="text-[10px] text-[#8b949e]">Sampai</label><input type="date" id="fin-to" class="glass-input text-xs w-full mt-1"></div>
+          <div><label class="text-[10px] text-[#8b949e]">Cabang</label><select id="fin-branch" class="glass-input text-xs w-full mt-1"><option value="all">Semua Cabang</option></select></div>
+          <div class="flex items-end gap-2">
+            <button onclick="loadFinancialReport()" class="flex-1 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold">Tampilkan</button>
+            <button onclick="exportFinancialExcel()" class="flex-1 py-2 bg-emerald-700 text-white rounded-xl text-xs font-semibold">Excel</button>
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3" id="fin-cards"></div>
+      <div class="glass-card overflow-x-auto" style="-webkit-overflow-scrolling:touch;">
+        <div class="p-4 text-sm font-bold text-white">Perbandingan Performa Cabang</div>
+        <table class="w-full min-w-[980px] text-left text-xs">
+          <thead class="bg-[#21262d] text-[#8b949e]">
+            <tr><th class="p-3">Cabang</th><th class="p-3 text-right">Transaksi</th><th class="p-3 text-right">Omzet</th><th class="p-3 text-right">Untung</th><th class="p-3 text-right">Pendapatan admin</th><th class="p-3 text-right">Pemasukan</th><th class="p-3 text-right">Pengeluaran</th><th class="p-3 text-right">Saldo aplikasi</th><th class="p-3 text-right">Kas fisik</th></tr>
+          </thead>
+          <tbody id="fin-table-body"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="tab-config" class="hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white">Konfigurasi Aplikasi per Cabang</h2>
+        <p class="text-xs text-[#8b949e]">Semua batas bersifat opsional. <b>Kosong = tanpa batas.</b> Angka 0 berarti batas nol (diblokir), hanya jika Anda isi sengaja. Batas diterapkan di server.</p>
+      </div>
+      <div class="glass-card p-5 max-w-xl space-y-4">
+        <div>
+          <label class="text-xs text-[#8b949e]">Cabang</label>
+          <select id="cfg-branch" class="glass-input text-xs w-full mt-1" onchange="loadBranchLimits()"></select>
+        </div>
+        <div class="space-y-3">
+          <h3 class="text-sm font-bold text-white">Batas Transaksi & Saldo</h3>
+          <div class="cfg-field"><label class="text-xs text-[#8b949e]">Maks. per transaksi (Rp)</label>
+            <div class="flex gap-2"><input id="cfg-single" inputmode="numeric" autocomplete="off" placeholder="Kosong = tanpa batas" class="glass-input text-xs w-full"><button type="button" onclick="clearLimit('cfg-single')" class="px-3 rounded-lg border border-[#30363d] text-[#8b949e] text-xs">Kosongkan</button></div></div>
+          <div class="cfg-field"><label class="text-xs text-[#8b949e]">Maks. per hari (Rp)</label>
+            <div class="flex gap-2"><input id="cfg-daily" inputmode="numeric" autocomplete="off" placeholder="Kosong = tanpa batas" class="glass-input text-xs w-full"><button type="button" onclick="clearLimit('cfg-daily')" class="px-3 rounded-lg border border-[#30363d] text-[#8b949e] text-xs">Kosongkan</button></div></div>
+          <div class="cfg-field"><label class="text-xs text-[#8b949e]">Maks. per bulan (Rp)</label>
+            <div class="flex gap-2"><input id="cfg-monthly" inputmode="numeric" autocomplete="off" placeholder="Kosong = tanpa batas" class="glass-input text-xs w-full"><button type="button" onclick="clearLimit('cfg-monthly')" class="px-3 rounded-lg border border-[#30363d] text-[#8b949e] text-xs">Kosongkan</button></div></div>
+          <div class="cfg-field"><label class="text-xs text-[#8b949e]">Maks. saldo per rekening (Rp)</label>
+            <div class="flex gap-2"><input id="cfg-balance" inputmode="numeric" autocomplete="off" placeholder="Kosong = tanpa batas" class="glass-input text-xs w-full"><button type="button" onclick="clearLimit('cfg-balance')" class="px-3 rounded-lg border border-[#30363d] text-[#8b949e] text-xs">Kosongkan</button></div></div>
+          <p id="cfg-error" class="text-xs text-red-400 hidden"></p>
+        </div>
+        <button id="cfg-save" onclick="saveBranchLimits()" class="w-full py-3 bg-[#17A897] text-white font-semibold rounded-xl text-xs hover:opacity-90">Simpan Batas</button>
+      </div>
+          <div class="glass-card p-5 max-w-xl space-y-4">
+        <div>
+          <label class="text-xs text-[#8b949e]">Biaya admin per layanan</label>
+          <p class="text-[10px] text-[#8b949e]">Kosong = kasir mengisi bebas. Jika diisi, biaya tarik tunai dikunci dan dicek di server.</p>
+        </div>
+        <div class="cfg-field"><label class="text-xs text-[#8b949e]">Biaya tarik tunai (Rp)</label><input id="fee-tt" inputmode="numeric" autocomplete="off" placeholder="Kosong = bebas" class="glass-input text-xs w-full"></div>
+        <div class="cfg-field"><label class="text-xs text-[#8b949e]">Biaya setor tunai (Rp)</label><input id="fee-setor" inputmode="numeric" autocomplete="off" placeholder="Kosong = bebas" class="glass-input text-xs w-full"></div>
+        <div class="cfg-field"><label class="text-xs text-[#8b949e]">Biaya PPOB (Rp)</label><input id="fee-ppob" inputmode="numeric" autocomplete="off" placeholder="Kosong = bebas" class="glass-input text-xs w-full"></div>
+        <div class="cfg-field"><label class="text-xs text-[#8b949e]">Biaya layanan lain (Rp)</label><input id="fee-lainnya" inputmode="numeric" autocomplete="off" placeholder="Kosong = bebas" class="glass-input text-xs w-full"></div>
+        <button id="fee-save" onclick="saveBranchFees()" class="w-full py-3 bg-[#17A897] text-white font-semibold rounded-xl text-xs hover:opacity-90">Simpan Biaya Admin</button>
+      </div>
+        </section>
+
+    <section id="tab-settings" class="hidden space-y-6">
+      <div>
+        <h2 class="text-xl font-bold text-white">Pengaturan Global</h2>
+        <p class="text-xs text-[#8b949e]">Berlaku untuk seluruh bisnis Anda.</p>
+      </div>
+      <div class="glass-card p-5 max-w-xl space-y-3">
+        <div>
+          <label class="text-xs text-[#8b949e]">Nama bisnis</label>
+          <input id="set-biz-name" maxlength="80" autocomplete="off" class="glass-input text-xs w-full mt-1">
+          <p class="text-[10px] text-[#8b949e] mt-1">2-80 karakter. Tampil di panel admin dan struk.</p>
+        </div>
+        <div>
+          <label class="text-xs text-[#8b949e]">Logo usaha (untuk struk)</label>
+          <div class="flex items-center gap-3 mt-1">
+            <div class="w-20 h-20 rounded-xl border border-[#30363d] flex items-center justify-center overflow-hidden bg-[#0d1117]">
+              <img id="set-logo-preview" alt="" class="max-w-full max-h-full hidden">
+              <span id="set-logo-empty" class="text-[10px] text-[#8b949e]">Belum ada</span>
+            </div>
+            <div class="space-y-2">
+              <input type="file" id="set-logo-file" accept="image/png,image/jpeg,image/webp" class="text-xs text-[#8b949e]">
+              <button type="button" onclick="removeBusinessLogo()" class="block px-3 py-1 rounded-lg border border-red-500/40 text-red-400 text-[10px]">Hapus logo</button>
+            </div>
+          </div>
+          <p class="text-[10px] text-[#8b949e] mt-1">PNG, JPG, atau WEBP. Otomatis diperkecil, maks. 256 px.</p>
+        </div>
+        <button onclick="saveBusinessName()" class="w-full py-3 bg-[#17A897] text-white font-semibold rounded-xl text-xs hover:opacity-90">Simpan Nama Bisnis</button>
+      </div>
+      <!-- KOTAK CADANGAN DATA BISNIS -->
+      <div class="glass-card p-5 max-w-xl space-y-3">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-cloud-arrow-down text-[#17A897]"></i> Cadangan Data Toko (Backup)
+        </h3>
+        <p class="text-xs text-[#8b949e]">
+          Unduh seluruh data transaksi, buku mutasi, daftar hutang, dan stok produk bisnis Anda sebagai file cadangan arsip.
+        </p>
+        <button type="button" onclick="downloadBusinessBackup()" id="btn-download-backup" class="w-full py-3 bg-[#21262d] border border-[#30363d] text-white font-semibold rounded-xl text-xs hover:bg-[#30363d] transition flex items-center justify-center gap-2">
+          <i class="fa-solid fa-download"></i> Unduh File Cadangan Lengkap (.json)
+        </button>
+      </div>
+    </section>
+
     <section id="tab-audit" class="hidden space-y-6">
       <div>
         <h2 class="text-xl font-bold text-white">Audit Log System (Immutable)</h2>
@@ -364,6 +517,8 @@
     </section>
 
   </main>
+  </div>
+  </div>
 
   <!-- JAVASCRIPT ENGINE -->
   <script>
@@ -394,26 +549,54 @@
         alert('Tidak dapat memverifikasi akun. Periksa koneksi lalu muat ulang.');
         return;
       }
-      if (!me || !me.allowed || me.role !== 'super_admin') {
-        alert('Akses Ditolak: Anda bukan Super Admin!');
+      if (!me || !me.allowed || !['super_admin', 'admin_cabang'].includes(me.role)) {
+        alert('Akses Ditolak: hanya Super Admin dan Admin Cabang.');
         window.location.replace('index.html');
         return;
       }
+      applyAdminCabangView(me);
       const roleRecord = { role: me.role, full_name: me.full_name };
 
       document.getElementById('admin-user-name').textContent = roleRecord.full_name || 'Super Admin';
-      document.getElementById('admin-user-email').textContent = session.user.email;
+      document.getElementById('admin-user-email').textContent = me.username ? '@' + me.username : session.user.email;
+      document.getElementById('nav-username').textContent = me.username ? '@' + me.username : '';
 
       await loadDashboardMetrics();
       await loadBranches();
     }
 
+    function toggleAdminSidebar(open) {
+      const side = document.getElementById('admin-sidebar');
+      const ov = document.getElementById('sidebar-overlay');
+      const show = open === undefined ? side.classList.contains('-translate-x-full') : open;
+      side.classList.toggle('-translate-x-full', !show);
+      ov.classList.toggle('hidden', !show);
+    }
+
+    // Admin Cabang: hanya Dashboard, Monitoring, dan Laporan (baca saja), cabang dikunci di server
+    const ADMIN_CABANG_TABS = ['overview', 'monitoring', 'finance'];
+
+    function applyAdminCabangView(me) {
+      window.NX_ROLE = me.role;
+      if (me.role !== 'admin_cabang') return;
+      document.querySelectorAll('button[id^="nav-"]').forEach(el => {
+        const tab = el.id.slice(4);
+        if (!ADMIN_CABANG_TABS.includes(tab)) el.style.display = 'none';
+      });
+      const sub = document.getElementById('nav-subtitle');
+      if (sub) sub.textContent = 'Admin Cabang · ' + (me.branch_name || '-');
+    }
+
     function switchAdminTab(tabName) {
+      if (window.NX_ROLE === 'admin_cabang' && !ADMIN_CABANG_TABS.includes(tabName)) tabName = 'overview';
       document.querySelectorAll('main > section').forEach(el => el.classList.add('hidden'));
       document.querySelectorAll('.sidebar-item').forEach(el => el.classList.remove('active'));
 
       document.getElementById(`tab-${tabName}`).classList.remove('hidden');
       document.getElementById(`nav-${tabName}`).classList.add('active');
+      document.getElementById('nav-title').textContent = document.getElementById(`nav-${tabName}`).textContent.trim();
+      toggleAdminSidebar(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       if (tabName === 'branches') loadBranches();
       if (tabName === 'permissions') preparePermissionsTab();
@@ -421,6 +604,9 @@
       if (tabName === 'users') loadUsers();
       if (tabName === 'monitoring') loadGlobalTransactions();
       if (tabName === 'audit') loadAuditLogs();
+      if (tabName === 'finance') loadFinancialReport();
+      if (tabName === 'config') prepareConfigTab();
+      if (tabName === 'settings') prepareSettingsTab();
     }
 
     // FORMAT CURRENCY HELPER
@@ -443,7 +629,7 @@
       document.getElementById('metric-total-cash').textContent = fmtRp(totalCashBal);
 
       // Populate Select Filters
-      const selects = ['filter-branch-overview', 'mon-filter-branch', 'adj-branch-id', 'trf-from-branch', 'trf-to-branch', 'perm-branch-select'];
+      const selects = ['filter-branch-overview', 'mon-filter-branch', 'adj-branch', 'trf-from-branch', 'trf-to-branch', 'perm-branch-select'];
       selects.forEach(id => {
         const el = document.getElementById(id);
         if (!el) return;
@@ -502,25 +688,58 @@
         return;
       }
       branchesData = branches;
+      const balSum = await branchBalances();
       tbody.innerHTML = branches.map(b => `
         <tr class="hover:bg-[#21262d]/50">
           <td class="p-4 font-mono font-bold text-sky-400">${b.code}</td>
-          <td class="p-4 font-semibold text-white">${b.name}</td>
+          <td class="p-4 font-semibold text-white">${escHtml(b.name)}</td>
           <td class="p-4 text-[#8b949e]">${b.phone || '-'} <br><span class="text-[10px]">${b.address || ''}</span></td>
-          <td class="p-4 font-semibold text-[#17A897]">${fmtRp(b.app_balance)}</td>
-          <td class="p-4 font-semibold text-sky-400">${fmtRp(b.cash_balance)}</td>
+          <td class="p-4 font-semibold text-[#17A897]">${fmtRp((balSum[b.id] || {}).app || 0)}</td>
+          <td class="p-4 font-semibold text-sky-400">${fmtRp((balSum[b.id] || {}).cash || 0)}</td>
           <td class="p-4">
-            <span class="px-2 py-1 text-[10px] font-bold rounded-full ${b.status === 'active' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">
+            <span class="px-2 py-1 text-[10px] font-bold rounded-full ${['active','aktif'].includes(b.status) ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}">
               ${b.status.toUpperCase()}
             </span>
           </td>
-          <td class="p-4 text-right space-x-2">
+          <td class="p-4 text-right space-x-2 whitespace-nowrap">
+            <button onclick="deleteBranch('${b.id}', '${escHtml(b.name).replace(/'/g, '')}')" class="px-2 py-1 bg-red-500/10 text-red-400 rounded hover:bg-red-500/20 text-[10px]">Hapus</button>
             <button onclick="toggleBranchStatus('${b.id}', '${b.status}')" class="px-2 py-1 bg-amber-500/10 text-amber-400 rounded hover:bg-amber-500/20 text-[10px]">
               Switch Status
             </button>
           </td>
         </tr>
       `).join('');
+    }
+
+    async function branchBalances() {
+      const { data } = await sb.rpc('nx_list_accounts');
+      const m = {};
+      (data || []).forEach(a => {
+        m[a.branch_id] = m[a.branch_id] || { app: 0, cash: 0 };
+        if (a.is_cash) m[a.branch_id].cash += Number(a.balance || 0);
+        else m[a.branch_id].app += Number(a.balance || 0);
+      });
+      return m;
+    }
+
+    async function deleteBranch(branchId, name) {
+      if (!confirm('Hapus cabang "' + name + '"? Hanya bisa jika cabang kosong (tanpa rekening, transaksi, atau karyawan).')) return;
+      const { error } = await sb.rpc('nx_delete_branch', { p_branch_id: branchId });
+      if (error) return alert(error.message);
+      notify('Cabang dihapus.', 'success');
+      loadBranches();
+    }
+
+    async function deleteUserAccount(userId) {
+      if (!confirm('Hapus akun ini? Akun tidak bisa masuk lagi. Riwayat transaksinya tetap tersimpan.')) return;
+      const { data, error } = await sb.functions.invoke('delete-account', { body: { user_id: userId } });
+      if (error) {
+        let msg = 'Gagal menghapus akun.';
+        try { const j = await error.context.json(); if (j && j.error) msg = j.error; } catch (e) { /* abaikan */ }
+        return alert(msg);
+      }
+      if (data && data.warning) alert(data.warning); else notify('Akun dihapus.', 'success');
+      loadUsers();
     }
 
     async function toggleBranchStatus(branchId, currentStatus) {
@@ -536,18 +755,25 @@
     }
 
     function openCreateBranchModal() {
-      const code = prompt('Masukkan Kode Cabang Unik (Contoh: CBG-002):');
-      if (!code) return;
-      const name = prompt('Masukkan Nama Cabang:');
-      if (!name) return;
+      ['nb-code', 'nb-name', 'nb-address', 'nb-phone'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('modal-new-branch').classList.remove('hidden');
+    }
+    function closeCreateBranchModal() { document.getElementById('modal-new-branch').classList.add('hidden'); }
 
-      sb.from('branches').insert([{ code, name, status: 'active' }]).then(({ error }) => {
-        if (error) alert('Gagal menambah cabang: ' + error.message);
-        else {
-          notify('Cabang baru berhasil dibuat!', 'success');
-          loadBranches();
-        }
-      });
+    async function submitCreateBranch() {
+      const g = id => document.getElementById(id).value.trim();
+      const code = g('nb-code'), name = g('nb-name');
+      if (code.length < 2 || name.length < 2) return alert('Kode dan nama cabang wajib diisi.');
+      const btn = document.getElementById('nb-submit'); btn.disabled = true; btn.textContent = 'Menyimpan...';
+      try {
+        const { error } = await sb.rpc('nx_create_branch', {
+          p_code: code, p_name: name, p_address: g('nb-address') || null, p_phone: g('nb-phone') || null
+        });
+        if (error) return alert('Gagal menambah cabang: ' + error.message);
+        closeCreateBranchModal();
+        notify('Cabang baru berhasil dibuat!', 'success');
+        await loadBranches();
+      } finally { btn.disabled = false; btn.textContent = 'Simpan Cabang'; }
     }
 
     // --- TAB 3: HAK AKSES PER CABANG ---
@@ -607,65 +833,149 @@
       else notify('Hak akses cabang disimpan!', 'success');
     }
 
-    // --- TAB 4: KONTROL SALDO HQ ---
+    // --- TAB 4: MANAJEMEN SALDO REKENING ---
+    let accountsCache = [];
+    const rupiah = v => 'Rp ' + Number(v || 0).toLocaleString('id-ID');
+    const newRequestId = () => (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random().toString(36).slice(2)));
+
+    let balBusy = false;
+    async function withBalLock(btn, fn) {
+      if (balBusy) return;
+      balBusy = true; if (btn) btn.disabled = true;
+      try { await fn(); } finally { balBusy = false; if (btn) btn.disabled = false; }
+    }
+
+    function fillBranchSelect(selId) {
+      const sel = document.getElementById(selId);
+      const prev = sel.value;
+      sel.innerHTML = '<option value="">-- Pilih Cabang --</option>' +
+        (branchesData || []).map(b => `<option value="${escHtml(b.id)}">${escHtml(b.code)} - ${escHtml(b.name)}</option>`).join('');
+      if (prev) sel.value = prev;
+    }
+
+    function fillAccountSelect(branchSelId, accSelId) {
+      const bid = document.getElementById(branchSelId).value;
+      const sel = document.getElementById(accSelId);
+      if (!bid) { sel.innerHTML = '<option value="">-- Pilih cabang dulu --</option>'; return; }
+      const list = accountsCache.filter(a => a.branch_id === bid);
+      sel.innerHTML = list.length
+        ? '<option value="">-- Pilih Rekening --</option>' + list.map(a => `<option value="${escHtml(a.id)}">${escHtml(a.name)} (${rupiah(a.balance)})</option>`).join('')
+        : '<option value="">Cabang ini belum punya rekening</option>';
+    }
+
+    async function loadAccountsCache() {
+      const { data, error } = await sb.rpc('nx_list_accounts');
+      if (error) { notify('Gagal memuat rekening: ' + error.message, 'error'); accountsCache = []; return; }
+      accountsCache = data || [];
+      const body = document.getElementById('acc-balance-body');
+      body.innerHTML = accountsCache.length === 0
+        ? '<tr><td colspan="4" class="p-4 text-center text-[#8b949e]">Belum ada rekening.</td></tr>'
+        : accountsCache.map(a => `<tr class="hover:bg-[#21262d]/50">
+            <td class="p-3 text-white">${escHtml(a.branch_name || '-')}</td>
+            <td class="p-3 text-white">${escHtml(a.name)}</td>
+            <td class="p-3 text-[#8b949e]">${a.is_cash ? 'Kas fisik' : 'Rekening'}</td>
+            <td class="p-3 text-right text-white whitespace-nowrap">${rupiah(a.balance)}</td></tr>`).join('');
+    }
+
     function prepareBalancesTab() {
-      loadDashboardMetrics();
+      fillBranchSelect('adj-branch'); fillBranchSelect('trf-from-branch'); fillBranchSelect('trf-to-branch');
+      loadAccountsCache().then(() => {
+        fillAccountSelect('adj-branch', 'adj-account');
+        fillAccountSelect('trf-from-branch', 'trf-from-account');
+        fillAccountSelect('trf-to-branch', 'trf-to-account');
+      });
+      loadBalanceLedger();
     }
 
     async function processBalanceAdjustment() {
-      const branchId = document.getElementById('adj-branch-id').value;
+      const btn = document.querySelector('[onclick="processBalanceAdjustment()"]');
+      return withBalLock(btn, doBalanceAdjustment);
+    }
+
+    async function doBalanceAdjustment() {
+      const accountId = document.getElementById('adj-account').value;
       const type = document.getElementById('adj-type').value;
       const amount = Number(document.getElementById('adj-amount').value);
       const reason = document.getElementById('adj-reason').value.trim();
+      if (!accountId) return alert('Pilih cabang dan rekening dulu.');
+      if (!(amount > 0)) return alert('Nominal harus lebih dari 0.');
+      if (!reason) return alert('Isi keterangan.');
+      if (!confirm((type === 'add' ? 'Tambah ' : 'Kurangi ') + rupiah(amount) + ' pada rekening ini?')) return;
 
-      if (!branchId || amount <= 0 || !reason) {
-        return alert('Lengkapi semua kolom penyesuaian saldo!');
-      }
-
-      const { data: { session } } = await sb.auth.getSession();
-      const { data, error } = await sb.rpc('nx_adjust_branch_balance', {
-        p_branch_id: branchId,
-        p_amount: amount,
-        p_type: type,
-        p_reason: reason,
-        p_admin_user_id: session.user.id
+      const { data, error } = await sb.rpc('nx_adjust_account_balance', {
+        p_account_id: accountId, p_amount: amount, p_type: type, p_reason: reason, p_request_id: newRequestId()
       });
-
-      if (error) alert('Gagal eksekusi saldo: ' + error.message);
-      else {
-        notify('Penyesuaian saldo berhasil!', 'success');
-        document.getElementById('adj-amount').value = '';
-        document.getElementById('adj-reason').value = '';
-        loadDashboardMetrics();
-      }
+      if (error) return alert('Gagal: ' + error.message);
+      if (data && data.duplicate) notify('Permintaan ini sudah pernah diproses.', 'warning');
+      else notify('Saldo rekening berhasil diperbarui.', 'success');
+      document.getElementById('adj-amount').value = '';
+      document.getElementById('adj-reason').value = '';
+      await refreshBalances();
     }
 
     async function processBranchTransfer() {
-      const fromId = document.getElementById('trf-from-branch').value;
-      const toId = document.getElementById('trf-to-branch').value;
+      const btn = document.querySelector('[onclick="processBranchTransfer()"]');
+      return withBalLock(btn, doBranchTransfer);
+    }
+
+    async function doBranchTransfer() {
+      const fromId = document.getElementById('trf-from-account').value;
+      const toId = document.getElementById('trf-to-account').value;
       const amount = Number(document.getElementById('trf-amount').value);
       const notes = document.getElementById('trf-notes').value.trim();
+      if (!fromId || !toId) return alert('Pilih rekening sumber dan rekening tujuan.');
+      if (fromId === toId) return alert('Rekening sumber dan tujuan tidak boleh sama.');
+      if (!(amount > 0)) return alert('Nominal harus lebih dari 0.');
+      if (!confirm('Transfer ' + rupiah(amount) + '?')) return;
 
-      if (!fromId || !toId || amount <= 0) {
-        return alert('Pilih cabang asal, cabang tujuan, dan nominal valid!');
-      }
-
-      const { data: { session } } = await sb.auth.getSession();
-      const { data, error } = await sb.rpc('nx_transfer_branch_balance', {
-        p_from_branch_id: fromId,
-        p_to_branch_id: toId,
-        p_amount: amount,
-        p_notes: notes,
-        p_admin_user_id: session.user.id
+      const { data, error } = await sb.rpc('nx_transfer_account_balance', {
+        p_from_account_id: fromId, p_to_account_id: toId, p_amount: amount, p_notes: notes, p_request_id: newRequestId()
       });
+      if (error) return alert('Transfer gagal: ' + error.message);
+      if (data && data.duplicate) notify('Transfer ini sudah pernah diproses.', 'warning');
+      else notify('Transfer saldo berhasil.', 'success');
+      document.getElementById('trf-amount').value = '';
+      document.getElementById('trf-notes').value = '';
+      await refreshBalances();
+    }
 
-      if (error) alert('Transfer gagal: ' + error.message);
-      else {
-        notify('Transfer saldo antar cabang sukses!', 'success');
-        document.getElementById('trf-amount').value = '';
-        document.getElementById('trf-notes').value = '';
-        loadDashboardMetrics();
-      }
+    async function refreshBalances() {
+      const prevAdj = document.getElementById('adj-account').value;
+      const prevFrom = document.getElementById('trf-from-account').value;
+      const prevTo = document.getElementById('trf-to-account').value;
+      await loadAccountsCache();
+      fillAccountSelect('adj-branch', 'adj-account'); document.getElementById('adj-account').value = prevAdj;
+      fillAccountSelect('trf-from-branch', 'trf-from-account'); document.getElementById('trf-from-account').value = prevFrom;
+      fillAccountSelect('trf-to-branch', 'trf-to-account'); document.getElementById('trf-to-account').value = prevTo;
+      loadDashboardMetrics();
+      loadBalanceLedger();
+    }
+
+    const LEDGER_KIND = {
+      saldo_rekening_tambah: 'Tambah saldo', saldo_rekening_kurang: 'Kurang saldo',
+      saldo_rekening_transfer_keluar: 'Transfer keluar', saldo_rekening_transfer_masuk: 'Transfer masuk',
+      pindah_saldo: 'Pindah saldo', komisi: 'Komisi', hitung_kas: 'Hitung kas', saldo_awal: 'Saldo awal'
+    };
+
+    async function loadBalanceLedger() {
+      const tbody = document.getElementById('bal-ledger-body');
+      if (!tbody) return;
+      const { data, error } = await sb.rpc('nx_list_account_ledger', { p_limit: 100 });
+      if (error) { tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-red-400">Gagal memuat mutasi: ' + escHtml(error.message) + '</td></tr>'; return; }
+      if (!data || data.length === 0) { tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-[#8b949e]">Belum ada mutasi.</td></tr>'; return; }
+      tbody.innerHTML = data.map(r => {
+        const delta = Number(r.delta || 0);
+        return `<tr class="hover:bg-[#21262d]/50">
+          <td class="p-3 text-[#8b949e] whitespace-nowrap">${escHtml(new Date(r['date']).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }))}</td>
+          <td class="p-3 text-white">${escHtml(r.branch_name || '-')}</td>
+          <td class="p-3 text-white">${escHtml(r.account_name || '-')}</td>
+          <td class="p-3 text-white">${escHtml(LEDGER_KIND[r.kind] || r.kind)}</td>
+          <td class="p-3 whitespace-nowrap ${delta < 0 ? 'text-red-400' : 'text-emerald-400'}">${delta < 0 ? '-' : '+'}${rupiah(Math.abs(delta))}</td>
+          <td class="p-3 text-[#8b949e] whitespace-nowrap">${rupiah(r.balance_before)} → ${rupiah(r.balance_after)}</td>
+          <td class="p-3 text-[#8b949e]">${escHtml(r.note || '')}</td>
+          <td class="p-3 text-[#8b949e]">${escHtml(r.actor_email || '-')}</td>
+        </tr>`;
+      }).join('');
     }
 
     // --- TAB 5: AKUN KARYAWAN ---
@@ -684,11 +994,12 @@
         const act = self ? '--' :
           `<button onclick="toggleUserActive('${escHtml(u.user_id)}', ${u.is_active ? 'false' : 'true'})" class="text-[10px] px-2 py-1 rounded-lg border border-[#30363d] text-white mr-1">${u.is_active ? 'Nonaktifkan' : 'Aktifkan'}</button>` +
           `<button onclick="openUserPerms('${escHtml(u.user_id)}')" class="text-[10px] px-2 py-1 rounded-lg border border-[#30363d] text-amber-400 mr-1">Izin</button>` +
+          `<button onclick="deleteUserAccount('${escHtml(u.user_id)}')" class="text-[10px] px-2 py-1 rounded-lg border border-red-500/40 text-red-400 mr-1">Hapus</button>` +
           `<button onclick="sendResetPassword('${escHtml(u.email)}')" class="text-[10px] px-2 py-1 rounded-lg border border-[#30363d] text-[#17A897]">Reset Password</button>`;
         return `
         <tr class="hover:bg-[#21262d]/50">
-          <td class="p-4 font-semibold text-white">${escHtml(u.full_name || '-')}<div class="text-[10px] text-[#8b949e]">${escHtml(u.username ? '@' + u.username : '')}</div></td>
-          <td class="p-4 text-[#8b949e]">${escHtml(u.email)}</td>
+          <td class="p-4 font-semibold text-white">${escHtml(u.full_name || '-')}</td>
+          <td class="p-4 text-sky-400 font-mono">${escHtml(u.username ? '@' + u.username : '-')}</td>
           <td class="p-4"><span class="px-2 py-1 bg-sky-500/10 text-sky-400 font-bold rounded-full text-[10px]">${escHtml(ROLE_TXT[u.role] || u.role)}</span></td>
           <td class="p-4 text-white">${escHtml(u.branches ? u.branches.name : '-')}</td>
           <td class="p-4"><span class="text-[10px] ${u.is_active ? 'text-emerald-400' : 'text-red-400'}">${u.is_active ? 'Aktif' : 'Nonaktif'}</span></td>
@@ -780,46 +1091,440 @@
       alert(error ? 'Gagal mengirim: ' + error.message : 'Email reset password dikirim.');
     }
 
-    // --- TAB 6: MONITORING TRANSAKSI ---
+    // --- TAB 6: MONITORING TRANSAKSI (lewat fungsi database, lintas cabang bisnis) ---
+    let monRows = [];
+    const ymd = d => d.toISOString().slice(0, 10);
+    const todayWib = () => new Date(Date.now() + 7 * 3600 * 1000);
+
+    async function initMonitoringFilters() {
+      const today = todayWib();
+      const from = new Date(today.getTime() - 6 * 86400000);
+      if (!document.getElementById('mon-to').value) {
+        document.getElementById('mon-to').value = ymd(today);
+        document.getElementById('mon-from').value = ymd(from);
+      }
+      const bsel = document.getElementById('mon-filter-branch'), bprev = bsel.value;
+      bsel.innerHTML = '<option value="all">Semua Cabang</option>' +
+        (branchesData || []).map(b => `<option value="${escHtml(b.id)}">${escHtml(b.code)} - ${escHtml(b.name)}</option>`).join('');
+      if (bprev) bsel.value = bprev;
+      const { data, error } = await sb.rpc('nx_tx_options');
+      if (error || !data) return;
+      const fill = (id, list, label) => {
+        const sel = document.getElementById(id), prev = sel.value;
+        sel.innerHTML = `<option value="all">${label}</option>` + list.map(v => `<option value="${escHtml(v.value)}">${escHtml(v.label)}</option>`).join('');
+        if (prev) sel.value = prev;
+      };
+      fill('mon-filter-staff', (data.staff || []).map(s => ({ value: s.user_id, label: s.name + ' (' + s.role + ')' })), 'Semua Karyawan');
+      fill('mon-filter-type', (data.types || []).map(t => ({ value: t, label: t })), 'Semua Jenis');
+      fill('mon-filter-status', (data.statuses || []).map(t => ({ value: t, label: t })), 'Semua Status');
+    }
+
     async function loadGlobalTransactions() {
-      const { data: txs } = await sb.from('transactions').select('*').order('date', { ascending: false }).limit(50);
       const tbody = document.getElementById('global-tx-table-body');
-      if (!txs || txs.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="8" class="p-4 text-center text-[#8b949e]">Belum ada transaksi recorded.</td></tr>';
+      await initMonitoringFilters();
+      const v = id => { const x = document.getElementById(id).value; return x === 'all' || x === '' ? null : x; };
+      const from = document.getElementById('mon-from').value;
+      const to = document.getElementById('mon-to').value;
+      if (!from || !to) return alert('Isi rentang tanggal.');
+      tbody.innerHTML = '<tr><td colspan="11" class="p-4 text-center text-[#8b949e]">Memuat...</td></tr>';
+
+      const { data, error } = await sb.rpc('nx_list_transactions', {
+        p_from: from, p_to: to, p_branch: v('mon-filter-branch'), p_user: v('mon-filter-staff'),
+        p_type: v('mon-filter-type'), p_status: v('mon-filter-status'),
+        p_search: document.getElementById('mon-search').value.trim() || null, p_limit: 200
+      });
+      if (error) {
+        tbody.innerHTML = '<tr><td colspan="11" class="p-4 text-center text-red-400">Gagal memuat: ' + escHtml(error.message) + '</td></tr>';
+        document.getElementById('mon-count').textContent = '';
         return;
       }
-      tbody.innerHTML = txs.map(t => `
-        <tr class="hover:bg-[#21262d]/50">
-          <td class="p-4 font-mono text-sky-400">${t.id.slice(0, 8)}...</td>
-          <td class="p-4 text-[#8b949e]">${new Date(t.date).toLocaleString('id-ID')}</td>
-          <td class="p-4 text-white">Cabang HQ</td>
-          <td class="p-4 font-semibold text-white">${t.type.toUpperCase()}</td>
-          <td class="p-4 text-[#8b949e]">${t.notes || '-'}</td>
-          <td class="p-4 text-right font-semibold text-[#17A897]">${fmtRp(t.admin_fee)}</td>
-          <td class="p-4 text-right font-semibold text-emerald-400">${fmtRp(t.profit)}</td>
-          <td class="p-4"><span class="px-2 py-1 text-[10px] bg-emerald-500/10 text-emerald-400 rounded-full">Success</span></td>
-        </tr>
-      `).join('');
+      monRows = (data && data.rows) || [];
+      document.getElementById('mon-count').textContent = 'Menampilkan ' + monRows.length + ' dari ' + (data ? data.total : 0) + ' transaksi';
+      if (monRows.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="p-4 text-center text-[#8b949e]">Tidak ada transaksi pada filter ini.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = monRows.map((t, idx) => `
+        <tr class="hover:bg-[#21262d]/50 cursor-pointer" onclick="openTxDetail(${idx})">
+          <td class="p-3 font-mono text-sky-400">${escHtml(String(t.id).slice(0, 10))}…</td>
+          <td class="p-3 text-[#8b949e] whitespace-nowrap">${escHtml(new Date(t['date']).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }))}</td>
+          <td class="p-3 text-white">${escHtml(t.branch_name || '-')}</td>
+          <td class="p-3 text-white">${escHtml(t.employee_name || '-')}</td>
+          <td class="p-3 font-semibold text-white">${escHtml(String(t.type || '').toUpperCase())}</td>
+          <td class="p-3 text-[#8b949e]">${escHtml(t.customer_name || t.notes || '-')}</td>
+          <td class="p-3 text-right text-white whitespace-nowrap">${rupiah(t.amount)}</td>
+          <td class="p-3 text-right text-[#17A897] whitespace-nowrap">${t.type === 'tarik_setor' ? rupiah(Number(t.admin_fee || 0) - Number(t.amount || 0)) : '-'}</td>
+          <td class="p-3 text-right text-emerald-400 whitespace-nowrap">${rupiah(t.profit)}</td>
+          <td class="p-3">${escHtml(t.status || '-')}</td>
+          <td class="p-3 ${Number(t.edit_count) > 0 ? 'text-amber-400' : 'text-[#8b949e]'}">${Number(t.edit_count) || 0}×</td>
+        </tr>`).join('');
+    }
+
+    function openTxDetail(idx) {
+      const t = monRows[idx];
+      if (!t) return;
+      const row = (k, v) => `<div class="flex justify-between gap-3 border-b border-[#30363d] py-1"><span class="text-[#8b949e]">${k}</span><span class="text-right">${escHtml(v == null || v === '' ? '-' : v)}</span></div>`;
+      document.getElementById('tx-detail-body').innerHTML = [
+        row('ID transaksi', t.id), row('Waktu', new Date(t['date']).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })),
+        row('Cabang', t.branch_name), row('Karyawan', t.employee_name || t.employee_email),
+        row('Jenis', t.type), row('Status', t.status), row('Pelanggan', t.customer_name), row('Keterangan', t.notes),
+        row('Jumlah', t.quantity), row('Nominal', rupiah(t.amount)), row('Biaya admin', t.type === 'tarik_setor' ? rupiah(Number(t.admin_fee || 0) - Number(t.amount || 0)) : '-'), row('Total bayar', rupiah(t.admin_fee)),
+        row('Harga pokok', rupiah(t.cost_price)), row('Profit', rupiah(t.profit)),
+        row('Aplikasi / sumber', t.sender_app), row('Jenis admin', t.admin_type)
+      ].join('');
+      document.getElementById('tx-history-body').innerHTML = 'Memuat...';
+      document.getElementById('modal-tx-detail').classList.remove('hidden');
+      loadTxHistory(t.id);
+    }
+
+    async function loadTxHistory(txId) {
+      const { data, error } = await sb.rpc('nx_transaction_history', { p_tx: txId });
+      const el = document.getElementById('tx-history-body');
+      if (error) { el.textContent = 'Gagal memuat riwayat: ' + error.message; return; }
+      if (!data || data.length === 0) { el.textContent = 'Belum pernah diubah.'; return; }
+      el.innerHTML = data.map(h => `<div class="p-2 rounded-lg border border-[#30363d]">
+        <div class="text-white">${escHtml(new Date(h.edited_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }))} · ${escHtml(h.edited_by || '-')}</div>
+        <div class="text-[10px] mt-1">Sebelum: ${escHtml(JSON.stringify(h.before_data || {}))}</div>
+        <div class="text-[10px]">Sesudah: ${escHtml(JSON.stringify(h.after_data || {}))}</div></div>`).join('');
+    }
+
+    function closeTxDetail() { document.getElementById('modal-tx-detail').classList.add('hidden'); }
+
+    function exportMonitoringExcel() {
+      if (!window.XLSX) return alert('Library Excel belum termuat. Periksa koneksi lalu muat ulang.');
+      if (monRows.length === 0) return alert('Tidak ada data untuk diekspor.');
+      const rows = monRows.map(t => ({
+        'ID': t.id, 'Waktu': new Date(t['date']).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+        'Cabang': t.branch_name || '', 'Karyawan': t.employee_name || t.employee_email || '',
+        'Jenis': t.type || '', 'Pelanggan': t.customer_name || '', 'Keterangan': t.notes || '',
+        'Nominal': Number(t.amount || 0), 'Biaya Admin': t.type === 'tarik_setor' ? Number(t.admin_fee || 0) - Number(t.amount || 0) : 0, 'Total': Number(t.admin_fee || 0),
+        'Harga Pokok': Number(t.cost_price || 0), 'Profit': Number(t.profit || 0),
+        'Status': t.status || '', 'Jumlah Edit': Number(t.edit_count || 0)
+      }));
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Transaksi');
+      XLSX.writeFile(wb, 'monitoring-transaksi-' + document.getElementById('mon-from').value + '_' + document.getElementById('mon-to').value + '.xlsx');
+    }
+
+    // --- TAB 8: LAPORAN KEUANGAN ---
+    let finData = null;
+    let finPiutang = 0;
+    const wibToday = () => new Date(Date.now() + 7 * 3600 * 1000);
+    const wibYmd = d => d.toISOString().slice(0, 10);
+
+    function finPreset(p) {
+      const t = wibToday();
+      const back = n => new Date(t.getTime() - n * 86400000);
+      let from = t, to = t;
+      if (p === 'yesterday') { from = back(1); to = back(1); }
+      if (p === '7d') from = back(6);
+      if (p === '30d') from = back(29);
+      if (p === 'month') from = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), 1));
+      document.getElementById('fin-from').value = wibYmd(from);
+      document.getElementById('fin-to').value = wibYmd(to);
+      loadFinancialReport();
+    }
+
+    function finInitBranches() {
+      const sel = document.getElementById('fin-branch'), prev = sel.value;
+      sel.innerHTML = '<option value="all">Semua Cabang</option>' +
+        (branchesData || []).map(b => `<option value="${escHtml(b.id)}">${escHtml(b.code)} - ${escHtml(b.name)}</option>`).join('');
+      if (prev) sel.value = prev;
+    }
+
+    async function loadFinancialReport() {
+      finInitBranches();
+      if (!document.getElementById('fin-from').value) finPreset('today');
+      const from = document.getElementById('fin-from').value;
+      const to = document.getElementById('fin-to').value;
+      const b = document.getElementById('fin-branch').value;
+      if (!from || !to) return alert('Isi rentang tanggal.');
+      const body = document.getElementById('fin-table-body');
+      body.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-[#8b949e]">Memuat...</td></tr>';
+      const { data, error } = await sb.rpc('nx_financial_report', { p_from: from, p_to: to, p_branch: b === 'all' ? null : b });
+      if (error) { body.innerHTML = '<tr><td colspan="9" class="p-4 text-center text-red-400">Gagal: ' + escHtml(error.message) + '</td></tr>'; return; }
+      finData = data;
+      const s = data.summary;
+      const card = (label, val, cls) => `<div class="glass-card p-4"><div class="text-[10px] text-[#8b949e]">${label}</div><div class="text-lg font-bold ${cls}">${val}</div></div>`;
+      const { data: piu } = await sb.rpc('nx_piutang_by_branch');
+      finPiutang = (piu || []).filter(r => b === 'all' || r.branch_id === b)
+        .reduce((t, r) => t + Number(r.piutang || 0), 0);
+      document.getElementById('fin-cards').innerHTML = [
+        card('Omzet', rupiah(s.omzet), 'text-amber-400'), card('Untung', rupiah(s.untung), 'text-emerald-400'),
+        card('Pendapatan admin', rupiah(s.pendapatan_admin), 'text-[#17A897]'), card('Jumlah transaksi', s.jumlah_transaksi, 'text-white'),
+        card('Pemasukan', rupiah(s.pemasukan), 'text-emerald-400'), card('Pengeluaran', rupiah(s.pengeluaran), 'text-red-400'),
+        card('Saldo aplikasi (sekarang)', rupiah(s.saldo_aplikasi), 'text-white'), card('Kas fisik (sekarang)', rupiah(s.kas_fisik), 'text-sky-400'),
+        card('Piutang belum dibayar', rupiah(finPiutang), 'text-amber-400')
+      ].join('');
+      body.innerHTML = (data.branches || []).length === 0
+        ? '<tr><td colspan="9" class="p-4 text-center text-[#8b949e]">Belum ada cabang.</td></tr>'
+        : data.branches.map(r => `<tr class="hover:bg-[#21262d]/50">
+            <td class="p-3 text-white">${escHtml(r.branch_name)}</td>
+            <td class="p-3 text-right">${Number(r.jumlah_transaksi) || 0}</td>
+            <td class="p-3 text-right whitespace-nowrap">${rupiah(r.omzet)}</td>
+            <td class="p-3 text-right text-emerald-400 whitespace-nowrap">${rupiah(r.untung)}</td>
+            <td class="p-3 text-right whitespace-nowrap">${rupiah(r.pendapatan_admin)}</td>
+            <td class="p-3 text-right text-emerald-400 whitespace-nowrap">${rupiah(r.pemasukan)}</td>
+            <td class="p-3 text-right text-red-400 whitespace-nowrap">${rupiah(r.pengeluaran)}</td>
+            <td class="p-3 text-right whitespace-nowrap">${rupiah(r.saldo_aplikasi)}</td>
+            <td class="p-3 text-right whitespace-nowrap">${rupiah(r.kas_fisik)}</td></tr>`).join('');
+    }
+
+    function exportFinancialExcel() {
+      if (!window.XLSX) return alert('Library Excel belum termuat. Periksa koneksi lalu muat ulang.');
+      if (!finData) return alert('Tampilkan laporan dulu.');
+      const from = document.getElementById('fin-from').value, to = document.getElementById('fin-to').value;
+      const s = finData.summary;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet([
+        { Keterangan: 'Periode', Nilai: from + ' s/d ' + to },
+        { Keterangan: 'Omzet', Nilai: Number(s.omzet) }, { Keterangan: 'Untung', Nilai: Number(s.untung) },
+        { Keterangan: 'Pendapatan admin', Nilai: Number(s.pendapatan_admin) }, { Keterangan: 'Jumlah transaksi', Nilai: Number(s.jumlah_transaksi) },
+        { Keterangan: 'Pemasukan', Nilai: Number(s.pemasukan) }, { Keterangan: 'Pengeluaran', Nilai: Number(s.pengeluaran) },
+        { Keterangan: 'Saldo aplikasi (sekarang)', Nilai: Number(s.saldo_aplikasi) }, { Keterangan: 'Kas fisik (sekarang)', Nilai: Number(s.kas_fisik) },
+        { Keterangan: 'Piutang belum dibayar', Nilai: Number(finPiutang) }
+      ]), 'Ringkasan');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet((finData.branches || []).map(r => ({
+        'Cabang': r.branch_name, 'Transaksi': Number(r.jumlah_transaksi), 'Omzet': Number(r.omzet), 'Untung': Number(r.untung),
+        'Pendapatan Admin': Number(r.pendapatan_admin), 'Pemasukan': Number(r.pemasukan), 'Pengeluaran': Number(r.pengeluaran),
+        'Saldo Aplikasi': Number(r.saldo_aplikasi), 'Kas Fisik': Number(r.kas_fisik)
+      }))), 'Per Cabang');
+      XLSX.writeFile(wb, 'laporan-keuangan-' + from + '_' + to + '.xlsx');
+    }
+
+    // --- TAB 9: KONFIGURASI BATAS PER CABANG ---
+    const CFG_FIELDS = [['cfg-single','max_tx_single'],['cfg-daily','max_tx_daily'],['cfg-monthly','max_tx_monthly'],['cfg-balance','max_balance']];
+
+    // Terima angka dengan titik sebagai pemisah ribuan. Tolak koma, huruf, tanda minus, dan desimal.
+    function parseLimitInput(raw) {
+      const t = String(raw == null ? '' : raw).trim();
+      if (t === '') return { ok: true, value: null };
+      if (t.startsWith('-')) return { ok: false, msg: 'Batas tidak boleh negatif.' };
+      if (t.includes(',')) return { ok: false, msg: 'Gunakan titik sebagai pemisah ribuan, tanpa koma atau desimal.' };
+      const c = t.replace(/\./g, '').replace(/\s/g, '');
+      if (!/^\d+$/.test(c)) return { ok: false, msg: 'Isi dengan angka saja, contoh: 5.000.000' };
+      const n = Number(c);
+      if (!Number.isSafeInteger(n)) return { ok: false, msg: 'Angka terlalu besar.' };
+      return { ok: true, value: n };
+    }
+
+    async function saveBranchFees() {
+      const bid = document.getElementById('cfg-branch').value;
+      if (!bid) return alert('Pilih cabang dulu.');
+      const ids = ['fee-tt', 'fee-setor', 'fee-ppob', 'fee-lainnya'];
+      const v = {};
+      for (const id of ids) {
+        const p = parseLimitInput(document.getElementById(id).value);
+        if (!p.ok) return alert('Biaya admin: ' + p.msg);
+        v[id] = p.value;
+      }
+      const btn = document.getElementById('fee-save'); btn.disabled = true; btn.textContent = 'Menyimpan...';
+      try {
+        const { error } = await sb.rpc('nx_save_branch_fees', {
+          p_branch_id: bid, p_tt: v['fee-tt'], p_setor: v['fee-setor'], p_ppob: v['fee-ppob'], p_lainnya: v['fee-lainnya']
+        });
+        if (error) return alert('Gagal menyimpan biaya: ' + error.message);
+        notify('Biaya admin cabang disimpan.', 'success');
+        await loadBranchLimits();
+      } finally { btn.disabled = false; btn.textContent = 'Simpan Biaya Admin'; }
+    }
+
+    function clearLimit(id) { document.getElementById(id).value = ''; }
+
+    function fmtLimitInput(v) { return v === null || v === undefined ? '' : Number(v).toLocaleString('id-ID'); }
+
+    function prepareConfigTab() {
+      fillBranchSelect('cfg-branch');
+      if (document.getElementById('cfg-branch').value) loadBranchLimits();
+    }
+
+    async function loadBranchLimits() {
+      const bid = document.getElementById('cfg-branch').value;
+      document.getElementById('cfg-error').classList.add('hidden');
+      CFG_FIELDS.forEach(([id]) => document.getElementById(id).value = '');
+      ['fee-tt','fee-setor','fee-ppob','fee-lainnya'].forEach(id => document.getElementById(id).value = '');
+      if (!bid) return;
+      const { data, error } = await sb.from('branch_configs')
+        .select('max_tx_single, max_tx_daily, max_tx_monthly, max_balance, fee_tarik_tunai, fee_setor_tunai, fee_ppob, fee_lainnya')
+        .eq('branch_id', bid).maybeSingle();
+      if (error) return notify('Gagal memuat batas: ' + error.message, 'error');
+      if (!data) return;
+      CFG_FIELDS.forEach(([id, col]) => document.getElementById(id).value = fmtLimitInput(data[col]));
+      document.getElementById('fee-tt').value = fmtLimitInput(data.fee_tarik_tunai);
+      document.getElementById('fee-setor').value = fmtLimitInput(data.fee_setor_tunai);
+      document.getElementById('fee-ppob').value = fmtLimitInput(data.fee_ppob);
+      document.getElementById('fee-lainnya').value = fmtLimitInput(data.fee_lainnya);
+    }
+
+    async function saveBranchLimits() {
+      const bid = document.getElementById('cfg-branch').value;
+      const err = document.getElementById('cfg-error');
+      err.classList.add('hidden');
+      if (!bid) return alert('Pilih cabang dulu.');
+
+      const vals = {};
+      for (const [id, col] of CFG_FIELDS) {
+        const p = parseLimitInput(document.getElementById(id).value);
+        if (!p.ok) { err.textContent = p.msg; err.classList.remove('hidden'); return; }
+        vals[col] = p.value;
+      }
+      const btn = document.getElementById('cfg-save'); btn.disabled = true; btn.textContent = 'Menyimpan...';
+      try {
+        const { error } = await sb.rpc('nx_save_branch_limits', {
+          p_branch_id: bid, p_single: vals.max_tx_single, p_daily: vals.max_tx_daily,
+          p_monthly: vals.max_tx_monthly, p_balance: vals.max_balance
+        });
+        if (error) return alert('Gagal menyimpan: ' + error.message);
+        notify('Batas cabang disimpan.', 'success');
+        await loadBranchLimits();
+      } finally { btn.disabled = false; btn.textContent = 'Simpan Batas'; }
+    }
+
+    // --- TAB 10: PENGATURAN GLOBAL ---
+    let logoPending = null;   // null = tidak diubah, '' = hapus, string = logo baru
+
+    async function prepareSettingsTab() {
+      const { data } = await sb.from('businesses').select('name, logo_data').maybeSingle();
+      document.getElementById('set-biz-name').value = data ? data.name : '';
+      logoPending = null;
+      showLogoPreview(data ? data.logo_data : null);
+    }
+
+    function showLogoPreview(src) {
+      const img = document.getElementById('set-logo-preview');
+      const empty = document.getElementById('set-logo-empty');
+      if (src) { img.src = src; img.classList.remove('hidden'); empty.classList.add('hidden'); }
+      else { img.removeAttribute('src'); img.classList.add('hidden'); empty.classList.remove('hidden'); }
+    }
+
+    function removeBusinessLogo() {
+      logoPending = '';
+      document.getElementById('set-logo-file').value = '';
+      showLogoPreview(null);
+    }
+
+    // Perkecil logo di browser agar ringan (maks 256 px, PNG)
+    async function logoFileToDataUrl(file) {
+      const url = URL.createObjectURL(file);
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+      URL.revokeObjectURL(url);
+      const r = Math.min(1, 256 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * r));
+      c.height = Math.max(1, Math.round(img.height * r));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL('image/png');
+    }
+
+    document.addEventListener('change', async (e) => {
+      if (!e.target || e.target.id !== 'set-logo-file') return;
+      const f = e.target.files && e.target.files[0];
+      if (!f) return;
+      try {
+        logoPending = await logoFileToDataUrl(f);
+        showLogoPreview(logoPending);
+      } catch (err) {
+        alert('Gagal membaca gambar. Coba file lain.');
+        e.target.value = '';
+      }
+    });
+
+    async function saveBusinessName() {
+      const name = document.getElementById('set-biz-name').value.trim();
+      if (name.length < 2 || name.length > 80) return alert('Nama bisnis harus 2-80 karakter.');
+      const { error } = await sb.rpc('nx_update_business_profile', { p_name: name, p_logo: logoPending });
+      if (error) return alert('Gagal menyimpan: ' + error.message);
+      logoPending = null;
+      notify('Nama bisnis disimpan.', 'success');
+      const sub = document.querySelector('header p.text-\\[10px\\]');
+      if (sub) sub.textContent = name + ' · Super Admin';
+    }
+
+    async function downloadBusinessBackup() {
+      const btn = document.getElementById('btn-download-backup');
+      const originalText = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Menyiapkan cadangan data...';
+
+      try {
+        // Ambil data penting milik bisnis ini secara paralel
+        const [
+          { data: txs },
+          { data: accounts },
+          { data: products },
+          { data: debts },
+          { data: debtPays },
+          { data: expenses },
+          { data: customers }
+        ] = await Promise.all([
+          sb.from('transactions').select('*'),
+          sb.from('accounts').select('*'),
+          sb.from('vouchers').select('*'),
+          sb.from('debts').select('*'),
+          sb.from('debt_payments').select('*'),
+          sb.from('expenses').select('*'),
+          sb.from('customers').select('*')
+        ]);
+
+        const backupData = {
+          app: 'Nexora Business Center',
+          backup_version: '2.0',
+          exported_at: new Date().toISOString(),
+          business: document.getElementById('set-biz-name').value || 'Bisnis',
+          data: {
+            accounts: accounts || [],
+            products: products || [],
+            transactions: txs || [],
+            debts: debts || [],
+            debt_payments: debtPays || [],
+            expenses: expenses || [],
+            customers: customers || []
+          }
+        };
+
+        // Buat file Blob dan unduh otomatis di browser
+        const jsonString = 'data:text/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(backupData, null, 2));
+        const downloadAnchor = document.createElement('a');
+        const filename = `Backup_Nexora_${(document.getElementById('set-biz-name').value || 'Toko').replace(/\s+/g, '_')}_${new Date().toISOString().slice(0, 10)}.json`;
+
+        downloadAnchor.setAttribute('href', jsonString);
+        downloadAnchor.setAttribute('download', filename);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+
+        notify('File cadangan berhasil diunduh!', 'success');
+      } catch (err) {
+        console.error(err);
+        alert('Gagal membuat cadangan data: ' + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+      }
     }
 
     // --- TAB 7: AUDIT LOGS ---
     async function loadAuditLogs() {
       const { data: logs } = await sb.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(50);
+      const { data: names } = await sb.rpc('nx_staff_names');
       const tbody = document.getElementById('audit-table-body');
       if (!logs || logs.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="p-4 text-center text-[#8b949e]">Belum ada catatan audit.</td></tr>';
         return;
       }
-      tbody.innerHTML = logs.map(l => `
+      tbody.innerHTML = logs.map(l => {
+        const who = l.user_id && names && names[l.user_id] ? names[l.user_id] : (l.user_email || '-');
+        return `
         <tr class="hover:bg-[#21262d]/50">
-          <td class="p-4 text-[#8b949e]">${new Date(l.created_at).toLocaleString('id-ID')}</td>
-          <td class="p-4 font-semibold text-white">${l.user_email}</td>
-          <td class="p-4 text-sky-400 font-mono">${l.user_role}</td>
-          <td class="p-4 font-bold text-amber-400">${l.action_type}</td>
-          <td class="p-4 text-white">${l.branch_name || 'HQ'}</td>
-          <td class="p-4 text-[#8b949e]">${l.description}</td>
-        </tr>
-      `).join('');
+          <td class="p-4 text-[#8b949e] whitespace-nowrap">${escHtml(new Date(l.created_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }))}</td>
+          <td class="p-4 font-semibold text-white">${escHtml(who)}</td>
+          <td class="p-4 text-sky-400 font-mono">${escHtml(l.user_role || '-')}</td>
+          <td class="p-4 font-bold text-amber-400">${escHtml(l.action_type || '-')}</td>
+          <td class="p-4 text-white">${escHtml(l.branch_name || 'HQ')}</td>
+          <td class="p-4 text-[#8b949e]">${escHtml(l.description || '')}</td>
+        </tr>`;
+      }).join('');
     }
 
     async function handleLogout() {
@@ -859,6 +1564,9 @@
         put('metric-total-cash', fmtRp(st.cash_balance));
         put('metric-today-omzet', fmtRp(st.omzet));
         put('metric-today-profit', 'Untung: ' + fmtRp(st.profit));
+        const { data: pa, error: paErr } = await sb.rpc('nx_pendapatan_admin', {
+          p_from: wib(new Date(now.getTime() - days * 864e5)), p_to: wib(now), p_branch: branch });
+        put('metric-pendapatan-admin', paErr ? '-' : fmtRp(pa.pendapatan_admin));
         const lbl = document.getElementById('metric-today-omzet');
         if (lbl && lbl.parentElement.querySelector('span')) lbl.parentElement.querySelector('span').textContent = 'Omzet ' + LABEL[key];
         const opt = brSel && brSel.selectedOptions && brSel.selectedOptions[0];
@@ -923,6 +1631,20 @@
       <div class="flex gap-2 pt-1">
         <button onclick="closeUserPerms()" class="flex-1 px-4 py-2 rounded-xl text-xs border border-[#30363d] text-white">Batal</button>
         <button onclick="saveUserPerms()" class="flex-1 px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold">Simpan Izin</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="modal-new-branch" class="hidden fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+    <div class="glass-card p-5 w-full max-w-md space-y-3">
+      <h3 class="text-base font-bold text-white">Tambah Cabang Baru</h3>
+      <input id="nb-code" class="glass-input text-xs w-full" placeholder="Kode cabang unik (contoh: CBG-002)" autocapitalize="characters" autocomplete="off">
+      <input id="nb-name" class="glass-input text-xs w-full" placeholder="Nama cabang" autocomplete="off">
+      <input id="nb-address" class="glass-input text-xs w-full" placeholder="Alamat (opsional)" autocomplete="off">
+      <input id="nb-phone" class="glass-input text-xs w-full" placeholder="Nomor telepon (opsional)" inputmode="tel" autocomplete="off">
+      <div class="flex gap-2 pt-1">
+        <button onclick="closeCreateBranchModal()" class="flex-1 px-4 py-2 rounded-xl text-xs border border-[#30363d] text-white">Batal</button>
+        <button id="nb-submit" onclick="submitCreateBranch()" class="flex-1 px-4 py-2 bg-[#17A897] text-white rounded-xl text-xs font-semibold">Simpan Cabang</button>
       </div>
     </div>
   </div>

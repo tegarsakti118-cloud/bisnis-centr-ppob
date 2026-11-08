@@ -532,6 +532,66 @@
     });
 
     $('kasir-btn-next').addEventListener('click', showPay);
+    // === FITUR SCANNER KAMERA BARCODE ===
+    let html5QrCodeScanner = null;
+
+    const btnScanCam = $('btn-scan-camera');
+    const wrapScanner = $('scanner-reader-wrap');
+    const btnCloseCam = $('btn-close-scanner');
+
+    if (btnScanCam && wrapScanner) {
+      btnScanCam.addEventListener('click', async () => {
+        if (typeof Html5Qrcode === 'undefined') {
+          showNotification('Library scanner belum selesai dimuat. Periksa internet Anda.', 'error');
+          return;
+        }
+
+        wrapScanner.style.display = 'block';
+        if (!html5QrCodeScanner) {
+          html5QrCodeScanner = new Html5Qrcode('scanner-reader');
+        }
+
+        try {
+          await html5QrCodeScanner.start(
+            { facingMode: 'environment' }, // Gunakan kamera belakang HP
+            { fps: 10, qrbox: { width: 250, height: 160 } },
+            (decodedText) => {
+              // Sukses membaca barcode
+              const code = String(decodedText).trim();
+              const match = (appData.vouchers || []).find(v => v.barcode && String(v.barcode).trim() === code);
+
+              if (match) {
+                addToCart(match.id);
+                showNotification(`"${match.name}" masuk ke keranjang!`, 'success');
+              } else {
+                $('kasir-search').value = code;
+                renderResults();
+                showNotification(`Barcode: ${code} terbaca.`, 'info');
+              }
+
+              // Tutup kamera setelah dapat 1 barcode agar baterai HP hemat
+              stopCameraScanner();
+            },
+            () => {} // Abaikan frame kosong saat kamera mencari fokus
+          );
+        } catch (err) {
+          console.error(err);
+          wrapScanner.style.display = 'none';
+          showNotification('Gagal mengakses kamera. Izinkan izin kamera di browser Anda.', 'error');
+        }
+      });
+
+      const stopCameraScanner = async () => {
+        if (html5QrCodeScanner && html5QrCodeScanner.isScanning) {
+          await html5QrCodeScanner.stop();
+        }
+        wrapScanner.style.display = 'none';
+      };
+
+      if (btnCloseCam) {
+        btnCloseCam.addEventListener('click', stopCameraScanner);
+      }
+    }
     $('kasir-pay-back').addEventListener('click', showCart);
     $('kasir-btn-cancel').addEventListener('click', showCart);
 

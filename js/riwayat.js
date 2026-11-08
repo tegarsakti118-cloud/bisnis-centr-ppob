@@ -1,3 +1,10 @@
+
+// Nama pembuat transaksi (username), dari fungsi nx_staff_names (diisi di app.js)
+function staffLabel(uid) {
+  const m = window.nxStaffNames || {};
+  const name = m[String(uid)];
+  return name || '-';
+}
 // ==========================================
 // NEXORA - MENU RIWAYAT (v2.4)
 //   - Default tampilan = transaksi HARI INI (WIB / Asia Jakarta), filter dijalankan di Supabase
@@ -375,11 +382,15 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     const status = entryStatus(e);
     const debtBadge = status === 'Hutang' ? ' <span class="badge-debt">Hutang</span>' : '';
 
+  
     const actions = (printable) => `
       <div class="tx-action-btns">
         <button type="button" class="btn-detail" data-act="detail" title="Detail"><i class="fa-solid fa-eye"></i></button>
         <button type="button" class="btn-edit" data-act="edit" title="Edit"><i class="fa-solid fa-pen"></i></button>
-        ${printable ? '<button type="button" class="btn-receipt" data-act="print" title="Cetak struk"><i class="fa-solid fa-print"></i></button>' : ''}
+        ${printable ? `
+          <button type="button" class="btn-receipt" data-act="print" title="Cetak struk"><i class="fa-solid fa-print"></i></button>
+          <button type="button" class="btn-wa" data-act="wa" title="Kirim WhatsApp" style="color:#22c55e; background:rgba(34,197,94,0.15);"><i class="fa-brands fa-whatsapp"></i></button>
+        ` : ''}
         <button type="button" class="btn-delete" data-act="delete" title="Hapus"><i class="fa-solid fa-trash-can"></i></button>
       </div>`;
 
@@ -391,7 +402,7 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
           <td style="text-align:center;"><span class="tx-check-spacer"></span></td>
           <td><strong style="color:#38bdf8; font-size:11px; display:block;">${escapeHtml(String(t.id).toUpperCase())}</strong>
             <span style="font-size:10px; color:var(--text-muted);">${dateTxt}</span></td>
-          <td>Owner</td>
+          <td>${escapeHtml(staffLabel(t.user_id))}</td>
           <td>${escapeHtml(accName(t.from_account_id))}</td>
           <td>Pindah Saldo</td>
           <td><div class="tx-ket" title="${escapeHtml(note)}">${escapeHtml(note)}</div></td>
@@ -410,7 +421,7 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
         <td style="text-align:center;"><input type="checkbox" class="tx-checkbox" value="${id}"></td>
         <td><strong style="color:#38bdf8; font-size:11px; display:block;">${escapeHtml(String(tx.id).toUpperCase())}</strong>
           <span style="font-size:10px; color:var(--text-muted);">${dateTxt}</span></td>
-        <td>Owner</td>
+        <td>${escapeHtml(staffLabel(tx.user_id))}</td>
         <td>${escapeHtml(accName(tx.accountId))}</td>
         <td>${escapeHtml(txTypeLabel(tx.type))}</td>
         <td><div class="tx-ket" title="${escapeHtml(note)}">${escapeHtml(note)}</div>${debtBadge}</td>
@@ -505,12 +516,15 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       add('Pembayaran Lewat', accName(tx.payAccountId));
       add('Sumber Modal', accName(tx.accountId));
       if (num(tx.quantity) > 0) add('Jumlah Barang', String(tx.quantity));
-      add('Total Penjualan', rp(tx.admin_fee));
+      add('Total Bayar', rp(tx.admin_fee));
+      if (tx.type === 'tarik_setor') add('Biaya Admin', rp(Number(tx.admin_fee || 0) - Number(tx.amount || 0)));
       add('Modal', rp(tx.cost_price !== null && tx.cost_price !== undefined ? tx.cost_price : tx.amount));
     } else {
       add('Aplikasi Pengirim', accName(tx.accountId));
       add('Aplikasi Penerima', accName(tx.payAccountId));
-      add('Nominal Transaksi', rp(tx.admin_fee));
+      add('Nominal Transaksi', rp(tx.amount));
+      if (tx.type === 'tarik_setor') add('Biaya Admin', rp(Number(tx.admin_fee || 0) - Number(tx.amount || 0)));
+      add('Total Bayar', rp(tx.admin_fee));
       add('Harga Modal', rp(tx.cost_price !== null && tx.cost_price !== undefined ? tx.cost_price : tx.amount));
     }
     add('Keuntungan', rp(tx.profit), num(tx.profit) >= 0 ? 'pos' : 'neg');
@@ -859,6 +873,18 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
           if (kind === 'transfer') { if (typeof deleteTransfer === 'function') deleteTransfer(id); } else deleteTransaction(id);
           break;
         default: break;
+          switch (btn.dataset.act) {
+        case 'detail': openDetail(kind, id); break;
+        case 'edit': openEdit(kind, id); break;
+        case 'print': printReceipts([id]); break;
+        case 'wa':
+          if (window.NxWhatsApp) window.NxWhatsApp.sendReceiptWA([id]);
+          break;
+        case 'delete':
+          if (kind === 'transfer') { if (typeof deleteTransfer === 'function') deleteTransfer(id); } else deleteTransaction(id);
+          break;
+        default: break;
+          }
       }
     });
 

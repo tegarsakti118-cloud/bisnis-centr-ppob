@@ -120,9 +120,19 @@
 
     if (on) {
       const adminEl = $('tt-admin');
-      if (adminEl && !adminEl.value) {
-        const saved = loadDefaultFee();
-        if (saved > 0) adminEl.value = saved.toLocaleString('id-ID');
+      const cfgFee = window.nxBranchCfg ? window.nxBranchCfg.fee_tarik_tunai : null;
+      if (adminEl) {
+        if (cfgFee !== null && cfgFee !== undefined) {
+          // Biaya diatur Super Admin untuk cabang ini: terisi otomatis dan dikunci
+          adminEl.value = Number(cfgFee).toLocaleString('id-ID');
+          adminEl.readOnly = true;
+        } else {
+          adminEl.readOnly = false;
+          if (!adminEl.value) {
+            const saved = loadDefaultFee();
+            if (saved > 0) adminEl.value = saved.toLocaleString('id-ID');
+          }
+        }
       }
       renderCalc();
     }

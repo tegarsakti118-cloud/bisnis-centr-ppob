@@ -101,13 +101,6 @@
         <input type="password" id="reg-password2" placeholder="••••••••" autocomplete="new-password" />
       </div>
     </div>
-    <div class="input-group">
-      <label>Kode Aktivasi</label>
-      <div class="input-wrapper">
-        <i class="fa-solid fa-key"></i>
-        <input type="text" id="reg-code" placeholder="Kode dari Nexora" autocomplete="off" autocapitalize="characters" />
-      </div>
-    </div>
 
     <button class="btn btn-primary" id="btn-register" onclick="processRegister()">Daftar</button>
 
@@ -141,7 +134,7 @@
       }
     });
 
-    ['reg-name', 'reg-business', 'reg-email', 'reg-username', 'reg-password', 'reg-password2', 'reg-code'].forEach(id => {
+    ['reg-name', 'reg-business', 'reg-email', 'reg-username', 'reg-password', 'reg-password2'].forEach(id => {
       document.getElementById(id).addEventListener('keydown', (e) => {
         if (e.key === 'Enter') processRegister();
       });
@@ -166,35 +159,45 @@
       const username = v('reg-username').trim().toLowerCase();
       const password = v('reg-password');
       const password2 = v('reg-password2');
-      const invite_code = v('reg-code').trim();
 
-      if (!full_name || !business_name || !email || !username || !password || !password2 || !invite_code) {
+      if (!full_name || !business_name || !email || !username || !password || !password2) {
         return notify('Semua kolom wajib diisi.', 'warning');
       }
-      if (!/^[a-z0-9_.]{3,30}$/.test(username)) return notify('Username 3-30 karakter: huruf kecil, angka, titik, atau garis bawah.', 'warning');
+      if (!/^[a-z0-9_.]{3,30}$/.test(username)) {
+        return notify('Username 3-30 karakter: huruf kecil, angka, titik, atau garis bawah.', 'warning');
+      }
       if (password.length < 8) return notify('Password minimal 8 karakter.', 'warning');
       if (password !== password2) return notify('Password dan ulangi password tidak sama.', 'warning');
 
       setBusy(true);
       try {
-        // Role TIDAK dikirim dari sini: server yang menetapkan Super Admin setelah kode aktivasi valid.
-        const { error } = await sbAuth.functions.invoke('register-owner', {
-          body: { full_name, business_name, email, username, password, invite_code }
+        // Panggil fungsi database registrasi trial 7 hari secara langsung
+        const { data, error } = await sbAuth.rpc('nx_register_new_owner', {
+          p_full_name: full_name,
+          p_business_name: business_name,
+          p_email: email,
+          p_username: username,
+          p_password: password
         });
-        if (error) {
-          notify(await functionError(error), 'error', 6000);
+
+        if (error || (data && !data.success)) {
+          const errMsg = (data && data.error) || (error && error.message) || 'Pendaftaran gagal.';
+          notify(errMsg, 'error', 6000);
           setBusy(false);
           return;
         }
+
+        // Otomatis login begitu selesai daftar
         const login = await sbAuth.auth.signInWithPassword({ email, password });
         if (login.error) {
-          await notify('Pendaftaran berhasil. Silakan masuk.', 'success', 2500);
+          await notify('Pendaftaran berhasil! Silakan login dengan akun Anda.', 'success', 2500);
           window.location.replace(new URL('login.html', window.location.href).href);
           return;
         }
+
         try { await sbAuth.rpc('nx_log_auth_event', { p_type: 'LOGIN' }); } catch (e) { /* abaikan */ }
-        await notify('Pendaftaran berhasil!', 'success', 1500);
-        window.location.replace(new URL('admin.html', window.location.href).href);
+        await notify('Pendaftaran berhasil! Selamat mencoba Trial 7 Hari.', 'success', 1500);
+        window.location.replace(new URL('index.html', window.location.href).href);
         return;
       } catch (err) {
         notify(authMessage(err), 'error');
