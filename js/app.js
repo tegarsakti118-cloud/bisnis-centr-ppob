@@ -137,8 +137,10 @@ function renderUserWidget() {
 
       const exp = me.subscription_until ? new Date(me.subscription_until) : null;
       const daysLeft = exp ? Math.ceil((exp - new Date()) / (1000 * 60 * 60 * 24)) : 0;
-      const isUnlimited = me.role === 'super_admin' || daysLeft > 365;
 
+      // HANYA EMAIL DEVELOPER LU YANG LIFETIME! (Ganti dengan email asli lu)
+      const DEVELOPER_EMAIL = 'sakapay404@gmail.com'; 
+      const isUnlimited = (currentUserEmail || '').toLowerCase() === DEVELOPER_EMAIL.toLowerCase();
       if (isUnlimited) {
         // Akun Developer / Super Admin: Tampil Lifetime Access
         badge.style.cssText = 'display:inline-block; margin-top:4px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);';
