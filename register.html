@@ -171,31 +171,48 @@
 
       setBusy(true);
       try {
-        // Panggil fungsi database registrasi trial 7 hari secara langsung
-        const { data, error } = await sbAuth.rpc('nx_register_new_owner', {
-          p_full_name: full_name,
-          p_business_name: business_name,
-          p_email: email,
-          p_username: username,
-          p_password: password
+        // 1. Daftarkan akun ke Auth Supabase secara resmi
+        const { data: authData, error: authError } = await sbAuth.auth.signUp({
+          email: email,
+          password: password,
+          options: {
+            data: { full_name: full_name, username: username }
+          }
         });
 
-        if (error || (data && !data.success)) {
-          const errMsg = (data && data.error) || (error && error.message) || 'Pendaftaran gagal.';
-          notify(errMsg, 'error', 6000);
+        if (authError) {
+          notify(authMessage(authError), 'error');
           setBusy(false);
           return;
         }
 
-        // Otomatis login begitu selesai daftar
-        const login = await sbAuth.auth.signInWithPassword({ email, password });
-        if (login.error) {
-          await notify('Pendaftaran berhasil! Silakan login dengan akun Anda.', 'success', 2500);
-          window.location.replace(new URL('login.html', window.location.href).href);
+        const newUserId = authData.user ? authData.user.id : null;
+        if (!newUserId) {
+          notify('Gagal membuat akun auth. Coba periksa kembali email Anda.', 'error');
+          setBusy(false);
           return;
         }
 
+        // 2. Siapkan Toko, Cabang, dan Trial 7 Hari di Database
+        const { data: setupData, error: setupError } = await sbAuth.rpc('nx_setup_new_owner', {
+          p_user_id: newUserId,
+          p_full_name: full_name,
+          p_business_name: business_name,
+          p_email: email,
+          p_username: username
+        });
+
+        if (setupError || (setupData && !setupData.success)) {
+          const msg = (setupData && setupData.error) || (setupError && setupError.message) || 'Gagal menyiapkan data bisnis.';
+          notify(msg, 'error', 6000);
+          setBusy(false);
+          return;
+        }
+
+        // 3. Login & langsung masuk ke aplikasi
+        await sbAuth.auth.signInWithPassword({ email, password });
         try { await sbAuth.rpc('nx_log_auth_event', { p_type: 'LOGIN' }); } catch (e) { /* abaikan */ }
+
         await notify('Pendaftaran berhasil! Selamat mencoba Trial 7 Hari.', 'success', 1500);
         window.location.replace(new URL('index.html', window.location.href).href);
         return;
