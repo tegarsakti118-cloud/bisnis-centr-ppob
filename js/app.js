@@ -2182,20 +2182,49 @@ function deleteCustomer(customerId) {
 function openSubscriptionUpgradeModal() {
   const me = window.nxMe || {};
   const biz = window.nxBiz || {};
-  const packages = (window.NexoraAuth && window.NexoraAuth.PRICING_PACKAGES) || [];
+
+  // Daftar paket promo mandiri (tidak akan pernah kosong meskipun cache lama)
+  const packages = (window.NexoraAuth && window.NexoraAuth.PRICING_PACKAGES && window.NexoraAuth.PRICING_PACKAGES.length)
+    ? window.NexoraAuth.PRICING_PACKAGES
+    : [
+        { 
+          name: 'Paket Bulanan (1 Bulan)', 
+          days: 30, 
+          originalPrice: 'Rp 49.000', 
+          price: 'Rp 34.999', 
+          label: '1 Bulan Penuh', 
+          badge: 'Diskon 30%' 
+        },
+        { 
+          name: 'Paket Hemat (6 Bulan)', 
+          days: 180, 
+          originalPrice: 'Rp 294.000', 
+          price: 'Rp 179.999', 
+          label: '6 Bulan Hemat', 
+          badge: 'Hemat 40%' 
+        },
+        { 
+          name: 'Paket Tahunan (1 Tahun)', 
+          days: 365, 
+          originalPrice: 'Rp 588.000', 
+          price: 'Rp 299.999', 
+          label: '1 Tahun (Paling Laris)', 
+          badge: 'Super Hemat 50%' 
+        }
+      ];
 
   const pkgCards = packages.map((pkg) => `
-    <div style="padding:14px; border:1px solid rgba(255,255,255,0.1); border-radius:12px; background:rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center; gap:10px;">
-      <div>
-        <div style="display:flex; align-items:center; gap:6px;">
+    <div style="padding:12px 14px; border:1px solid rgba(255,255,255,0.1); border-radius:12px; background:rgba(255,255,255,0.03); display:flex; justify-content:space-between; align-items:center; gap:10px;">
+      <div style="min-width:0;">
+        <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
           <strong style="font-size:13px; color:#fff;">${pkg.name}</strong>
           ${pkg.badge ? `<span style="font-size:9px; font-weight:700; background:rgba(248,113,113,0.2); color:#f87171; border:1px solid rgba(248,113,113,0.3); padding:1px 6px; border-radius:999px;">${pkg.badge}</span>` : ''}
         </div>
         <span style="font-size:11px; color:#94a3b8; display:block; margin-top:2px;">${pkg.label}</span>
       </div>
-      <div style="text-align:right;">
+      <div style="text-align:right; flex-shrink:0;">
         ${pkg.originalPrice ? `<span style="font-size:11px; color:#64748b; text-decoration:line-through; display:block;">${pkg.originalPrice}</span>` : ''}
-        <span style="font-size:16px; font-weight:800; color:#34d399; display:block;">${pkg.price}</span>
+        <span style="font-size:15px; font-weight:800; color:#34d399; display:block;">${pkg.price}</span>
         <button type="button" onclick="checkoutViaWA('${pkg.name}', '${pkg.price}')" class="btn-mini btn-mini-green" style="margin-top:4px; padding:6px 12px; border-radius:8px; cursor:pointer;">
           Pilih Promo
         </button>
