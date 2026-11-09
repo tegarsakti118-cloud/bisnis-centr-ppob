@@ -10,7 +10,7 @@
 //
 // Mengubah daftar file di SHELL? Naikkan VERSION agar cache lama dibersihkan.
 // ==========================================
-const VERSION = 'nexora-v50';
+const VERSION = 'nexora-v52';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 
@@ -22,6 +22,7 @@ const SHELL = [
   'admin.html',
   'forgot.html',
   'reset.html',
+  'landing.html',
   'manifest.json',
   'css/style.css',
   'js/supabase.js',
