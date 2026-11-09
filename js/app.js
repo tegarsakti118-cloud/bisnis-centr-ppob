@@ -2254,7 +2254,7 @@ function openSubscriptionUpgradeModal() {
 function checkoutViaWA(pkgName, price) {
   const me = window.nxMe || {};
   const biz = window.nxBiz || {};
-  const wa = (window.NexoraAuth && window.NexoraAuth.DEVELOPER_WA) || '6281234567890';
+  const wa = (window.NexoraAuth && window.NexoraAuth.DEVELOPER_WA) || '6285780243664';
   const bizName = biz.name || me.branch_name || 'Bisnis Saya';
   const username = me.username || me.full_name || '-';
 
