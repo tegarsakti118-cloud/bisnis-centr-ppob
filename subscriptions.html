@@ -113,28 +113,23 @@
         return;
       }
 
-      // Verifikasi hak akses: HANYA Super Admin yang boleh buka halaman ini
+      // Verifikasi sesi login
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        window.location.replace('login.html');
+        return;
+      }
+
+      // Verifikasi role Super Admin langsung via whoami
       try {
-        const { data: { user } } = await sb.auth.getUser();
-        if (!user) {
-          window.location.replace('login.html');
-          return;
-        }
-
-        // KUNCI DEVELOPER: Ganti 'email_kamu@gmail.com' dengan email asli akun lu!
-        const DEVELOPER_EMAIL = 'sakapay404@gmail.com'; // <-- GANTI DENGAN EMAIL LU
-
-        if (user.email.toLowerCase() !== DEVELOPER_EMAIL.toLowerCase()) {
-          alert('Akses Ditolak: Halaman khusus Developer Platform Nexora.');
+        const me = await NexoraAuth.whoami(sb);
+        if (!me || !me.allowed || me.role !== 'super_admin') {
+          alert('Akses Ditolak: Halaman ini khusus Super Admin.');
           window.location.replace('index.html');
           return;
         }
       } catch (err) {
-        console.error(err);
-        window.location.replace('login.html');
-        return;
-      } {
-        console.error(err);
+        console.error('Verifikasi gagal:', err);
         window.location.replace('login.html');
         return;
       }
@@ -146,9 +141,10 @@
       const tbody = document.getElementById('clients-tbody');
       tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-[#8b949e]">Mengambil data terbaru...</td></tr>';
 
-      const { data, error } = await sb.from('businesses').select('*').order('created_at', { ascending: false });
+      // Panggil fungsi RPC khusus yang menembus batas RLS secara aman
+      const { data, error } = await sb.rpc('nx_get_all_subscriptions');
       if (error) {
-        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-400">Gagal: ${escHtml(error.message)}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="p-6 text-center text-red-400">Gagal memuat: ${escHtml(error.message)}</td></tr>`;
         return;
       }
 
@@ -180,7 +176,7 @@
       document.getElementById('client-count-label').textContent = list.length;
 
       if (!list.length) {
-        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-[#8b949e]">Tidak ada bisnis yang cocok.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="p-6 text-center text-[#8b949e]">Belum ada bisnis klien terdaftar.</td></tr>';
         return;
       }
 
