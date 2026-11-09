@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
+  <script>
+    // Jaga gerbang: Cek apakah ada sesi login tersimpan di HP
+    (function () {
+      try {
+        const hasSession = Object.keys(localStorage).some(k => k.startsWith('sb-') && k.endsWith('-auth-token'));
+        // Jika orang baru / belum login sama sekali -> lempar ke landing page penjualan!
+        if (!hasSession) {
+          window.location.replace('landing.html');
+        }
+      } catch (e) {}
+    })();
+  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Nexora </title>
