@@ -869,14 +869,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
         case 'detail': openDetail(kind, id); break;
         case 'edit': openEdit(kind, id); break;
         case 'print': printReceipts([id]); break;
-        case 'delete':
-          if (kind === 'transfer') { if (typeof deleteTransfer === 'function') deleteTransfer(id); } else deleteTransaction(id);
-          break;
-        default: break;
-          switch (btn.dataset.act) {
-        case 'detail': openDetail(kind, id); break;
-        case 'edit': openEdit(kind, id); break;
-        case 'print': printReceipts([id]); break;
         case 'wa':
           if (window.NxWhatsApp) window.NxWhatsApp.sendReceiptWA([id]);
           break;
@@ -884,9 +876,7 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
           if (kind === 'transfer') { if (typeof deleteTransfer === 'function') deleteTransfer(id); } else deleteTransaction(id);
           break;
         default: break;
-          }
       }
-    });
 
     // Ganti hari (00:00 WIB) -> filter relatif (Hari ini, Kemarin, ...) otomatis diperbarui
     const checkRollover = () => {

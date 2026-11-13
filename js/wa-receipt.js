@@ -99,13 +99,6 @@
       return;
     }
 
-    if (list.length === 0) {
-      if (typeof showNotification === 'function') {
-        showNotification('Transaksi tidak ditemukan.', 'error');
-      }
-      return;
-    }
-
     const ctx = {
       biz: window.nxBiz || {},
       br: (window.nxBiz || {}).branch || {},
@@ -114,9 +107,9 @@
     };
 
     // Deteksi nomor HP pelanggan jika ada di data transaksi
-    let prefillPhone = defaultPhone;
+    let prefillPhone = String(defaultPhone || '').replace(/"/g, '');
     if (!prefillPhone) {
-      const first = list[0];
+      const first = uniqueList[0];
       const match = String(first.notes || '').match(/08\d{8,12}/);
       if (match) prefillPhone = match[0];
     }
@@ -162,11 +155,12 @@
         return;
       }
 
-      const receiptMsg = generateReceiptText(list, ctx);
+      const receiptMsg = generateReceiptText(uniqueList, ctx);
       const url = `https://api.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(receiptMsg)}`;
 
       modal.remove();
-      window.open(url, '_blank');
+      const win = window.open(url, '_blank');
+      if (!win) window.location.href = url;
     };
   }
 

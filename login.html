@@ -110,17 +110,16 @@
 
         // JIKA MASA LANGGANAN HABIS: Tampilkan notifikasi & langsung buka WA Admin
         if (reason === 'subscription_expired') {
-          const wa = (window.NexoraAuth && window.NexoraAuth.DEVELOPER_WA) || '625780243664';
+          const wa = (window.NexoraAuth && window.NexoraAuth.DEVELOPER_WA) || '6285780243664';
           const msg = encodeURIComponent('Halo Admin Nexora, masa trial bisnis saya sudah habis. Saya ingin perpanjang langganan akun kasir Nexora.');
           const waUrl = `https://api.whatsapp.com/send?phone=${wa}&text=${msg}`;
 
           notify('Masa aktif bisnis Anda telah berakhir. Menghubungkan ke WhatsApp Admin untuk perpanjang...', 'warning', 4000);
           setTimeout(() => {
-            window.open(waUrl, '_blank');
+            const win = window.open(waUrl, '_blank');
+            if (!win) window.location.href = waUrl;
           }, 1500);
         } else {
-          notify(NexoraAuth.blockMessage(reason), 'error', 6000);
-        }
 
         setBusy(false);
         return;

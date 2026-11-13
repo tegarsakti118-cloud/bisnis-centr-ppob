@@ -10,7 +10,7 @@
 //
 // Mengubah daftar file di SHELL? Naikkan VERSION agar cache lama dibersihkan.
 // ==========================================
-const VERSION = 'nexora-v52';
+const VERSION = 'nexora-v53';
 const SHELL_CACHE = `${VERSION}-shell`;
 const RUNTIME_CACHE = `${VERSION}-runtime`;
 

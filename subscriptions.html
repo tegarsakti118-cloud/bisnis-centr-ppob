@@ -120,11 +120,13 @@
         return;
       }
 
-      // Verifikasi role Super Admin langsung via whoami
+      // Verifikasi role Super Admin & email pengelola platform
+      const DEVELOPER_EMAIL = 'sakapay404@gmail.com';
       try {
         const me = await NexoraAuth.whoami(sb);
-        if (!me || !me.allowed || me.role !== 'super_admin') {
-          alert('Akses Ditolak: Halaman ini khusus Super Admin.');
+        const isDeveloper = (session.user.email || '').toLowerCase() === DEVELOPER_EMAIL.toLowerCase();
+        if (!me || !me.allowed || me.role !== 'super_admin' || !isDeveloper) {
+          alert('Akses Ditolak: Halaman ini khusus Pengelola Platform.');
           window.location.replace('index.html');
           return;
         }

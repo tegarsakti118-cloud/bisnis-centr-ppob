@@ -1,20 +1,10 @@
 // ==========================================
 // NEXORA - KASIR: KERANJANG, LIVE SEARCH & PEMBAYARAN
-//
-// Hanya mengurus TAMPILAN + perakitan data. Penyimpanan tetap memakai fungsi lama di app.js:
-//   runOps, buildAccountOps, confirmLowBalance, guardSubmit, printReceipts, refreshAllViews.
-// Struktur data TIDAK berubah: tiap baris keranjang disimpan sebagai satu transaksi
-// type 'voucher' (sama persis seperti sebelumnya), jadi hapus transaksi / kembalikan stok /
-// riwayat / laporan tetap bekerja tanpa perubahan.
-//
-// Dimuat setelah app.js dan features.js. Dipanggil dari app.js lewat:
-//   setupKasirUi()     -> setupVoucherForm()
-//   renderKasirCart()  -> initVoucherPage()
 // ==========================================
 (function () {
   'use strict';
 
-  let cart = [];                 // [{ id, qty }]; harga & stok selalu dibaca ulang dari appData.vouchers
+  let cart = [];
   let discount = { rp: 0, pct: 0 };
   let bound = false;
 
@@ -22,13 +12,10 @@
   const PAY_VIEW = 'sell-voucher-form';
   const CART_VIEW = 'kasir-cart-view';
 
-  // ---------- Helper data ----------
-
   function getProduct(id) {
     return (appData.vouchers || []).find((v) => String(v.id) === String(id)) || null;
   }
 
-  // Baris keranjang + data produk terkini. Produk yang sudah dihapus otomatis dibuang.
   function getLines() {
     cart = cart.filter((c) => getProduct(c.id));
     return cart.map((c) => {
@@ -50,8 +37,6 @@
     const f = $(PAY_VIEW);
     return !!f && !f.hidden;
   }
-
-  // ---------- Pencarian produk (real-time) ----------
 
   function resultCard(v) {
     const stock = Number(v.stock) || 0;
@@ -113,8 +98,6 @@
     if (input) input.value = '';
     closeResults();
   }
-
-  // ---------- Keranjang ----------
 
   function addToCart(id) {
     const v = getProduct(id);
@@ -180,7 +163,6 @@
       </div>`;
   }
 
-  // Dipanggil app.js (initVoucherPage) tiap halaman dimuat / data disegarkan
   function renderKasirCart() {
     const listEl = $('kasir-cart-list');
     if (!listEl) return;
@@ -202,7 +184,6 @@
     $('kasir-cart-total').textContent = formatRupiah(sumSell(lines));
     $('kasir-btn-next').disabled = lines.length === 0;
 
-    // Tanggal tidak boleh melewati sekarang
     const dateEl = $('kasir-date');
     if (dateEl) {
       const now = new Date();
@@ -215,8 +196,6 @@
       else updatePay();
     }
   }
-
-  // ---------- Perpindahan tampilan ----------
 
   function showCart() {
     $(PAY_VIEW).hidden = true;
@@ -238,8 +217,6 @@
     updatePay();
     window.scrollTo(0, 0);
   }
-
-  // ---------- Pembayaran ----------
 
   function calcTotals() {
     const lines = getLines();
@@ -293,7 +270,7 @@
     const rp = Math.min(getCleanNumber($('kasir-disc-rp')), subtotal);
     discount.rp = rp;
     discount.pct = subtotal ? Math.round((rp / subtotal) * 10000) / 100 : 0;
-    if (getCleanNumber($('kasir-disc-rp')) > subtotal) setRpField(rp); // dibatasi sebesar total belanja
+    if (getCleanNumber($('kasir-disc-rp')) > subtotal) setRpField(rp);
     $('kasir-disc-pct').value = discount.pct > 0 ? pctLabel(discount.pct) : '';
     updatePay();
   }
@@ -330,8 +307,6 @@
     showCart();
     renderKasirCart();
   }
-
-  // ---------- Simpan transaksi ----------
 
   async function submitKasirSale() {
     const form = $(PAY_VIEW);
@@ -378,7 +353,6 @@
       return;
     }
 
-    // Tanggal opsional: kosong = sekarang
     let txDate = new Date().toISOString();
     const dateVal = $('kasir-date').value;
     if (dateVal) {
@@ -397,7 +371,6 @@
     const totalModalSaldo = lines.reduce((s, l) => s + Number(l.v.modal_saldo || 0) * l.qty, 0);
     if (!(await confirmLowBalance(accInject, totalModalSaldo))) return;
 
-    // Diskon dibagi proporsional ke tiap baris; baris terakhir menampung sisa pembulatan
     let remaining = totalDisc;
     const txs = [];
     const debts = [];
@@ -460,7 +433,6 @@
     const ok = await runOps(ops);
     if (!ok) return;
 
-    // State lokal baru diubah SETELAH semua operasi cloud sukses (sama seperti recordTransaction)
     txs.forEach((tx) => appData.transactions.push(tx));
     debts.forEach((d) => appData.debts.push(d));
     stockUpdates.forEach((s) => { s.v.stock = s.newStock; });
@@ -473,11 +445,8 @@
 
     const change = !isDebt && paid > total ? ` Kembalian ${formatRupiah(paid - total)}.` : '';
     showNotification(`Transaksi kasir berhasil disimpan!${change}`, 'success');
-    // Transaksi hutang: tetap di halaman kasir (tidak pindah ke riwayat), sama seperti sebelumnya
     if (!isDebt) switchPage('transactions');
   }
-
-  // ---------- Pasang event (sekali saja) ----------
 
   function setupKasirUi() {
     if (bound) return;
@@ -492,7 +461,6 @@
       if (e.key !== 'Enter') return;
       e.preventDefault();
       const matches = findMatches(search.value);
-      // Pemindai barcode (keyboard) biasanya mengirim Enter: cocok persis -> langsung masuk keranjang
       const exact = matches.find((v) => v.barcode && String(v.barcode).toLowerCase() === search.value.trim().toLowerCase());
       const pick = exact || (matches.length === 1 ? matches[0] : null);
       if (pick) addToCart(pick.id);
@@ -502,8 +470,9 @@
       const add = e.target.closest('[data-add]');
       if (add && !add.disabled) { addToCart(add.dataset.add); return; }
       if (e.target.closest('[data-new-product]')) {
+        const typed = search.value.trim();
         closeResults();
-        if (typeof openAddProductModal === 'function') openAddProductModal();
+        if (typeof openAddProductModal === 'function') openAddProductModal(typed);
       }
     });
 
@@ -532,66 +501,123 @@
     });
 
     $('kasir-btn-next').addEventListener('click', showPay);
-    // === FITUR SCANNER KAMERA BARCODE ===
-    let html5QrCodeScanner = null;
 
+    let html5QrCodeScanner = null;
+    let scanHandled = false;
     const btnScanCam = $('btn-scan-camera');
     const wrapScanner = $('scanner-reader-wrap');
     const btnCloseCam = $('btn-close-scanner');
 
     if (btnScanCam && wrapScanner) {
+      const stopCameraScanner = async () => {
+        try {
+          if (html5QrCodeScanner && html5QrCodeScanner.isScanning) {
+            await html5QrCodeScanner.stop();
+          }
+        } catch (e) { /* abaikan */ }
+        wrapScanner.style.display = 'none';
+      };
+
+      const onScanSuccess = (decodedText) => {
+        if (scanHandled) return;
+        scanHandled = true;
+        const code = String(decodedText || '').trim();
+        const match = (appData.vouchers || []).find(
+          (v) => v.barcode && String(v.barcode).trim().toLowerCase() === code.toLowerCase()
+        );
+
+        if (match) {
+          addToCart(match.id);
+          showNotification(`"${match.name}" masuk ke keranjang!`, 'success');
+        } else {
+          search.value = code;
+          renderResults();
+          showNotification(`Barcode terbaca: ${code}`, 'success');
+        }
+        stopCameraScanner();
+      };
+
       btnScanCam.addEventListener('click', async () => {
         if (typeof Html5Qrcode === 'undefined') {
           showNotification('Library scanner belum selesai dimuat. Periksa internet Anda.', 'error');
           return;
         }
 
-        wrapScanner.style.display = 'block';
-        if (!html5QrCodeScanner) {
-          html5QrCodeScanner = new Html5Qrcode('scanner-reader');
+        if (html5QrCodeScanner && html5QrCodeScanner.isScanning) {
+          await stopCameraScanner();
+          return;
         }
+
+        scanHandled = false;
+        wrapScanner.style.display = 'block';
+
+        if (!html5QrCodeScanner) {
+          const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+            Html5QrcodeSupportedFormats.EAN_13,
+            Html5QrcodeSupportedFormats.EAN_8,
+            Html5QrcodeSupportedFormats.UPC_A,
+            Html5QrcodeSupportedFormats.UPC_E,
+            Html5QrcodeSupportedFormats.CODE_128,
+            Html5QrcodeSupportedFormats.CODE_39,
+            Html5QrcodeSupportedFormats.ITF,
+            Html5QrcodeSupportedFormats.QR_CODE
+          ] : undefined;
+
+          html5QrCodeScanner = new Html5Qrcode('scanner-reader', {
+            formatsToSupport: formats,
+            useBarCodeDetectorIfSupported: true,
+            verbose: false
+          });
+        }
+
+        const qrboxFn = (vw, vh) => ({
+          width: Math.max(180, Math.floor(vw * 0.85)),
+          height: Math.max(100, Math.floor(vh * 0.45))
+        });
 
         try {
           await html5QrCodeScanner.start(
-            { facingMode: 'environment' }, // Gunakan kamera belakang HP
-            { fps: 10, qrbox: { width: 250, height: 160 } },
-            (decodedText) => {
-              // Sukses membaca barcode
-              const code = String(decodedText).trim();
-              const match = (appData.vouchers || []).find(v => v.barcode && String(v.barcode).trim() === code);
-
-              if (match) {
-                addToCart(match.id);
-                showNotification(`"${match.name}" masuk ke keranjang!`, 'success');
-              } else {
-                $('kasir-search').value = code;
-                renderResults();
-                showNotification(`Barcode: ${code} terbaca.`, 'info');
+            { facingMode: 'environment' },
+            {
+              fps: 15,
+              qrbox: qrboxFn,
+              videoConstraints: {
+                facingMode: 'environment',
+                width: { ideal: 1280 },
+                height: { ideal: 720 },
+                focusMode: 'continuous'
               }
-
-              // Tutup kamera setelah dapat 1 barcode agar baterai HP hemat
-              stopCameraScanner();
             },
-            () => {} // Abaikan frame kosong saat kamera mencari fokus
+            onScanSuccess,
+            () => {}
           );
         } catch (err) {
-          console.error(err);
-          wrapScanner.style.display = 'none';
-          showNotification('Gagal mengakses kamera. Izinkan izin kamera di browser Anda.', 'error');
+          try {
+            await html5QrCodeScanner.start(
+              { facingMode: 'environment' },
+              { fps: 12, qrbox: qrboxFn },
+              onScanSuccess,
+              () => {}
+            );
+          } catch (err2) {
+            console.error(err2);
+            wrapScanner.style.display = 'none';
+            showNotification('Gagal mengakses kamera. Izinkan izin kamera di browser Anda.', 'error');
+          }
         }
       });
-
-      const stopCameraScanner = async () => {
-        if (html5QrCodeScanner && html5QrCodeScanner.isScanning) {
-          await html5QrCodeScanner.stop();
-        }
-        wrapScanner.style.display = 'none';
-      };
 
       if (btnCloseCam) {
         btnCloseCam.addEventListener('click', stopCameraScanner);
       }
+      document.addEventListener('click', (e) => {
+        if (e.target.closest('[data-page], #kasir-btn-next')) stopCameraScanner();
+      });
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) stopCameraScanner();
+      });
     }
+
     $('kasir-pay-back').addEventListener('click', showCart);
     $('kasir-btn-cancel').addEventListener('click', showCart);
 
@@ -607,7 +633,6 @@
       if (btn) setPaid(btn.dataset.amt);
     });
 
-    // Enter di kolom isian tidak boleh langsung menyimpan transaksi
     form.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.preventDefault();
     });

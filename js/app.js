@@ -1,13 +1,9 @@
 // ==========================================
 // NEXORA v2.1 - APP ENGINE (SUPABASE CLOUD)
-// Urutan <script> di index.html:
-//   CDN supabase-js -> js/supabase.js -> js/config.js -> js/app.js
 // ==========================================
 
-// 1. Client Supabase (dibuat satu kali di supabase.js)
 const sb = window.supabaseClient;
 
-// 2. State aplikasi global
 let appData = {
   accounts: [],
   transactions: [],
@@ -16,7 +12,6 @@ let appData = {
   expenses: [],
   customers: [],
   debtPayments: [],
-  // Fitur baru (diisi oleh js/features.js)
   balanceTransfers: [],
   commissions: [],
   cashCalculations: [],
@@ -29,7 +24,6 @@ let revenueChart = null;
 let uiBound = false;
 
 const CLOUD_TABLES = ['accounts', 'transactions', 'vouchers', 'debts', 'expenses', 'customers', 'debt_payments'];
-// Nama tabel di database -> nama properti di appData
 const TABLE_KEY = { debt_payments: 'debtPayments' };
 
 document.addEventListener('DOMContentLoaded', bootApp);
@@ -51,7 +45,6 @@ async function bootApp() {
     if (error) throw error;
     session = data.session;
   } catch (err) {
-    // Error jaringan BUKAN alasan untuk redirect (ini yang memicu loop login <-> index)
     console.error('Gagal memeriksa sesi:', err);
     document.body.classList.remove('auth-pending');
     showNotification('Tidak dapat memeriksa sesi login. Periksa koneksi lalu muat ulang.', 'error');
@@ -66,7 +59,6 @@ async function bootApp() {
   currentUserId = session.user.id;
   currentUserEmail = session.user.email || '';
 
-  // Verifikasi akun, role, dan status cabang di server (bukan dari localStorage)
   try {
     const { data: me, error: meErr } = await sb.rpc('nx_whoami');
     if (meErr) throw meErr;
@@ -99,12 +91,10 @@ async function bootApp() {
     return;
   }
 
-  // Jika sesi berakhir / logout dari tab lain -> kembali ke login
   sb.auth.onAuthStateChange((event) => {
     if (event === 'SIGNED_OUT') window.location.replace('login.html');
   });
 
-  // Pasang semua event DULU supaya UI selalu bisa diklik, walau cloud lambat/gagal
   bindUi();
   renderUserWidget();
   document.body.classList.remove('auth-pending');
@@ -130,7 +120,6 @@ function renderUserWidget() {
       ? NexoraAuth.roleLabel(me.role) + (me.branch_name ? ' · ' + me.branch_name : '')
       : 'Cloud - Terhubung';
 
-    // 1. Tampilkan sisa masa aktif langganan
     if (me && !document.getElementById('nx-sub-badge')) {
       const badge = document.createElement('span');
       badge.id = 'nx-sub-badge';
@@ -138,15 +127,12 @@ function renderUserWidget() {
       const exp = me.subscription_until ? new Date(me.subscription_until) : null;
       const daysLeft = exp ? Math.ceil((exp - new Date()) / (1000 * 60 * 60 * 24)) : 0;
 
-      // HANYA EMAIL DEVELOPER LU YANG LIFETIME! (Ganti dengan email asli lu)
-      const DEVELOPER_EMAIL = 'sakapay404@gmail.com'; 
+      const DEVELOPER_EMAIL = 'sakapay404@gmail.com';
       const isUnlimited = (currentUserEmail || '').toLowerCase() === DEVELOPER_EMAIL.toLowerCase();
       if (isUnlimited) {
-        // Akun Developer / Super Admin: Tampil Lifetime Access
         badge.style.cssText = 'display:inline-block; margin-top:4px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.3);';
         badge.textContent = '🌟 Lifetime Access';
       } else {
-        // Akun Klien: Tampil sisa hari & bisa diklik untuk beli promo
         badge.style.cssText = `display:inline-block; margin-top:4px; font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; cursor:pointer; ${
           daysLeft <= 3 ? 'background:rgba(239,68,68,0.2); color:#f87171; border:1px solid rgba(239,68,68,0.4);' : 'background:rgba(34,197,94,0.15); color:#4ade80; border:1px solid rgba(34,197,94,0.3);'
         }`;
@@ -161,7 +147,6 @@ function renderUserWidget() {
       roleEl.insertAdjacentElement('afterend', badge);
     }
 
-    // 2. Tombol panel admin untuk Super Admin
     if (me && me.role === 'super_admin' && !document.getElementById('nx-admin-link')) {
       const a = document.createElement('a');
       a.id = 'nx-admin-link';
@@ -183,8 +168,6 @@ function isAuthError(err) {
 // FETCH & SAVE DATA CLOUD SUPABASE
 // ==========================================
 
-// Ambil SEMUA baris tabel. Supabase membatasi 1000 baris per permintaan,
-// jadi data dibaca bertahap (per 1000) supaya riwayat panjang tidak terpotong.
 async function fetchAllRows(table) {
   const size = 1000;
   let from = 0;
@@ -229,8 +212,6 @@ async function fetchCloudData() {
     return false;
   }
 
-  // Tabel fitur baru (Pindah Saldo, Komisi & Fee, Kalkulator Uang) dimuat terpisah
-  // supaya kegagalannya tidak mengganggu fitur lama.
   if (typeof fetchFeatureTables === 'function') {
     try { await fetchFeatureTables(); } catch (err) { console.error('Gagal memuat tabel fitur baru:', err); }
   }
@@ -252,8 +233,6 @@ function getAppData() {
   return appData;
 }
 
-// Mengembalikan true/false. Update/delete yang mengenai 0 baris dianggap GAGAL
-// (biasanya karena ID salah atau diblokir RLS, yang tidak menghasilkan error di Supabase).
 async function saveCloudData(table, payload, action = 'insert', id = null) {
   try {
     let res;
@@ -279,14 +258,6 @@ async function saveCloudData(table, payload, action = 'insert', id = null) {
   }
 }
 
-// ------------------------------------------
-// PENYIMPANAN ATOMIK (fungsi database nx_apply_ops)
-// Semua operasi dalam satu permintaan berjalan di SATU transaksi database:
-// semua berhasil atau semua dibatalkan. Saldo & stok dikirim sebagai SELISIH
-// (bukan angka akhir dari HP), jadi aman walau dua HP dipakai bersamaan, dan setiap
-// perubahan saldo otomatis masuk Buku Mutasi Rekening.
-// Jika fungsi belum dipasang di Supabase, otomatis memakai cara lama (berurutan).
-// ------------------------------------------
 let atomicWarned = false;
 
 function isMissingFunctionError(err) {
@@ -294,8 +265,6 @@ function isMissingFunctionError(err) {
   return /could not find the function|schema cache|PGRST202|42883/i.test(msg);
 }
 
-// Ubah operasi format lama [tabel, data, aksi, id] ke format server.
-// Perubahan saldo/stok yang tadinya "angka akhir" diubah jadi selisih terhadap data di layar.
 function toServerOps(ops) {
   const list = ops.map(([table, payload, action, id]) => {
     if (action === 'update' && table === 'accounts' && payload && 'balance' in payload) {
@@ -319,8 +288,6 @@ function toServerOps(ops) {
   return list.filter((o) => !(o.t === 'incr' && o.amount === 0));
 }
 
-// Setelah penyimpanan sukses, nilai saldo/stok dari SERVER dipakai sebagai acuan layar.
-// Dijalankan sesudah kode pemanggil selesai mengubah state lokal (setTimeout 0).
 function scheduleServerSync(result) {
   if (!result) return;
   const accs = Array.isArray(result.accounts) ? result.accounts : [];
@@ -366,7 +333,6 @@ async function runOpsAtomic(ops, meta) {
   }
 }
 
-// Cara lama: berurutan satu per satu (cadangan jika fungsi atomik belum dipasang).
 async function runOpsSequential(ops) {
   for (const op of ops) {
     const ok = await saveCloudData(op[0], op[1], op[2], op[3]);
@@ -379,8 +345,6 @@ async function runOpsSequential(ops) {
   return true;
 }
 
-// meta (opsional): { kind, ref, note } untuk keterangan di Buku Mutasi.
-// Jika kosong, server menentukannya sendiri dari isi operasi.
 async function runOps(ops, meta = {}) {
   const res = await runOpsAtomic(ops, meta);
   if (res.ok) {
@@ -395,7 +359,6 @@ async function runOps(ops, meta = {}) {
     }
     return runOpsSequential(ops);
   }
-  // Gagal di server: tidak ada yang tersimpan sebagian. Segarkan layar agar sama dengan database.
   await fetchCloudData();
   refreshAllViews();
   return false;
@@ -410,8 +373,6 @@ function findAccount(id) {
   return appData.accounts.find((a) => String(a.id) === String(id)) || null;
 }
 
-// Peringatan (bukan blokir) jika saldo sumber tidak cukup untuk modal transaksi.
-// Resolve true = lanjut simpan, false = batal. Aman untuk semua cara menutup dialog.
 function confirmLowBalance(acc, needed) {
   if (!acc || Number(acc.balance || 0) >= Number(needed || 0)) return Promise.resolve(true);
   return new Promise((resolve) => {
@@ -445,7 +406,6 @@ function getCleanNumber(inputElement) {
 }
 
 function formatNumberInput(inputElement) {
-  // Guard: dipasang sekali saja per elemen (sebelumnya listener menumpuk tiap pindah halaman)
   if (!inputElement || inputElement.dataset.numFmt === '1') return;
   inputElement.dataset.numFmt = '1';
   inputElement.addEventListener('input', (e) => {
@@ -454,7 +414,6 @@ function formatNumberInput(inputElement) {
   });
 }
 
-// Menyimpan perubahan saldo: gabungkan delta per akun, hasilkan operasi cloud + fungsi apply lokal
 function buildAccountOps(deltas) {
   const map = new Map();
   deltas.forEach((d) => {
@@ -538,10 +497,6 @@ function showConfirm(title, message, onConfirm, isDanger = false) {
   };
 }
 
-// Modal form serbaguna.
-// fields: [{ id, label, type: 'text'|'tel'|'number'|'select', options:[{value,label}],
-//            value, placeholder, required, allowZero }]
-// onSubmit(values) -> boleh async; return false = modal tetap terbuka.
 function showFormModal({ title, icon = 'fa-solid fa-pen-to-square', fields, submitText = 'Simpan', onSubmit }) {
   const fieldsHtml = fields.map((f) => {
     if (f.type === 'info') return `<div class="fm-info">${escapeHtml(f.text)}</div>`;
@@ -627,7 +582,6 @@ function showFormModal({ title, icon = 'fa-solid fa-pen-to-square', fields, subm
   });
 }
 
-// Pembungkus submit form: cegah klik ganda & error tak tertangani
 function guardSubmit(form, handler) {
   form.onsubmit = async (e) => {
     e.preventDefault();
@@ -642,7 +596,6 @@ function guardSubmit(form, handler) {
       showNotification('Terjadi kesalahan: ' + (err.message || err), 'error');
     } finally {
       form.dataset.busy = '0';
-      // Pasangan aplikasi pengirim = penerima (js/validation.js): tombol proses tetap nonaktif
       if (btn) btn.disabled = form.dataset.pairInvalid === '1';
     }
   };
@@ -696,7 +649,6 @@ function switchPage(pageTarget) {
     if (alt !== pageTarget) switchPage(alt);
     return;
   }
-  // Tutup sidebar PERTAMA: error di loader halaman tidak boleh meninggalkan overlay menutupi layar
   closeSidebar();
 
   const section = document.getElementById(`page-${pageTarget}`);
@@ -735,7 +687,6 @@ function bindUi() {
   if (uiBound) return;
   uiBound = true;
 
-  // Navigasi: satu listener delegasi untuk sidebar + bottom nav
   document.addEventListener('click', (e) => {
     const link = e.target.closest('[data-page]');
     if (!link) return;
@@ -755,7 +706,7 @@ function bindUi() {
     if (el) el.addEventListener(event, fn);
   };
 
-  on('btn-add-voucher-modal', 'click', openAddProductModal);
+  on('btn-add-voucher-modal', 'click', () => openAddProductModal());
   on('btn-add-account', 'click', openAddAccountModal);
   on('btn-add-expense', 'click', openExpenseModal);
   on('btn-add-customer', 'click', openAddCustomerModal);
@@ -812,8 +763,6 @@ function txTypeLabel(type) {
   return type || '-';
 }
 
-// Simpan satu transaksi + (opsional) hutang + stok + perubahan saldo.
-// State lokal baru diubah SETELAH semua operasi cloud sukses.
 async function recordTransaction({ tx, deltas, voucher = null, newStock = null, debt = null }) {
   const { ops: balanceOps, applies } = buildAccountOps(deltas);
   const ops = [['transactions', tx, 'insert']];
@@ -848,8 +797,6 @@ function setupTarikSetorForm() {
   const form = document.getElementById('tarik-setor-form');
   if (!form) return;
 
-  // Validasi langsung: aplikasi sumber (ts-account) tidak boleh sama dengan rekening penerima (ts-pay-method).
-  // Layanan "Tarik Tunai" punya validasi sendiri (tarik-tunai.js), jadi pasangan ini tidak berlaku di sana.
   if (window.NxValidation) {
     const accEl = document.getElementById('ts-account');
     const payEl = document.getElementById('ts-pay-method');
@@ -859,7 +806,6 @@ function setupTarikSetorForm() {
   }
 
   guardSubmit(form, async () => {
-    // Layanan "Tarik Tunai" memakai alur khusus (Admin Luar / Admin Dalam) di js/tarik-tunai.js
     if (document.getElementById('ts-service').value === 'Tarik Tunai' && typeof submitTarikTunai === 'function') {
       await submitTarikTunai(form);
       return;
@@ -934,10 +880,9 @@ function setupTarikSetorForm() {
     if (!ok) return;
 
     form.reset();
-    setDefaultDateTime(document.getElementById('ts-date')); // reset() mengosongkan tanggal
+    setDefaultDateTime(document.getElementById('ts-date'));
     refreshAllViews();
     showNotification('Transaksi berhasil disimpan ke cloud!', 'success');
-    // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
     if (!isDebt) switchPage('transactions');
   });
 }
@@ -955,7 +900,6 @@ function initPpobPage() {
   syncPpobOther();
 }
 
-// Kolom "Nama / Jenis Layanan" hanya tampil (dan wajib) saat layanan = "Lainnya"
 function syncPpobOther() {
   const service = document.getElementById('ppob-service');
   const group = document.getElementById('ppob-other-group');
@@ -963,7 +907,7 @@ function syncPpobOther() {
   if (!service || !group || !input) return;
   const isOther = service.value === 'Lainnya';
   group.hidden = !isOther;
-  input.required = isOther;   // required hanya saat terlihat, agar tidak memblokir submit secara diam-diam
+  input.required = isOther;
   if (!isOther) input.value = '';
 }
 
@@ -1060,11 +1004,10 @@ function setupPpobForm() {
     if (!ok) return;
 
     form.reset();
-    setDefaultDateTime(document.getElementById('ppob-date')); // reset() mengosongkan tanggal
-    syncPpobOther(); // sembunyikan kolom Lainnya setelah form di-reset
+    setDefaultDateTime(document.getElementById('ppob-date'));
+    syncPpobOther();
     refreshAllViews();
     showNotification('Transaksi PPOB disimpan ke cloud!', 'success');
-    // Transaksi hutang: tetap di halaman input (tidak pindah ke riwayat)
     if (!isDebt) switchPage('transactions');
   });
 }
@@ -1079,10 +1022,8 @@ function initVoucherPage() {
   setSelectOptions(document.getElementById('vouch-select-account'), accountOptions('-- Pilih Akun / Sumber Modal (Inject) --'));
   setSelectOptions(document.getElementById('vouch-pay-method'), accountOptions('-- Pilih Pembayaran --', true));
 
-  // Keranjang & pencarian produk (js/kasir.js)
   if (typeof renderKasirCart === 'function') renderKasirCart();
 
-  // Izin "Tambah/Edit Produk": karyawan tanpa izin tetap bisa berjualan, tapi tidak bisa mengubah produk
   const canManageProduct = !window.nxMe || !window.nxMe.perms || window.nxMe.perms.kelola_produk !== false;
   const addBtn = document.getElementById('btn-add-voucher-modal');
   if (addBtn) addBtn.style.display = canManageProduct ? '' : 'none';
@@ -1117,14 +1058,17 @@ function initVoucherPage() {
   `).join('');
 }
 
-function openAddProductModal() {
+function openAddProductModal(prefill) {
+  const rawPrefill = typeof prefill === 'string' ? prefill.trim() : '';
+  const isBarcode = /^\d{4,}$/.test(rawPrefill);
+
   showFormModal({
     title: 'Tambah Produk Kasir',
     icon: 'fa-solid fa-box',
     submitText: 'Tambah Produk',
     fields: [
-      { id: 'name', label: 'Nama Produk / Barang', type: 'text', required: true, placeholder: 'Contoh: Telkomsel 7GB / Teh Botol' },
-      { id: 'barcode', label: 'Barcode / Kode Barang (Opsional)', type: 'text', placeholder: 'Ketik atau klik tombol scan di samping' },
+      { id: 'name', label: 'Nama Produk / Barang', type: 'text', required: true, value: isBarcode ? '' : rawPrefill, placeholder: 'Contoh: Telkomsel 7GB / Teh Botol' },
+      { id: 'barcode', label: 'Barcode / Kode Barang (Opsional)', type: 'text', value: isBarcode ? rawPrefill : '', placeholder: 'Ketik atau klik tombol scan di samping' },
       { id: 'modal_saldo', label: 'Modal Saldo / Inject Server (Rp)', type: 'number', required: true, allowZero: true, value: '0' },
       { id: 'modal_fisik', label: 'Modal Barang Fisik (Rp)', type: 'number', required: true, allowZero: true, value: '0' },
       { id: 'price', label: 'Harga Jual ke Pelanggan (Rp)', type: 'number', required: true },
@@ -1149,12 +1093,10 @@ function openAddProductModal() {
     }
   });
 
-  // Sisipkan tombol Scan Kamera & wadah kamera khusus di samping kolom barcode
   setTimeout(() => {
     const barInput = document.getElementById('fm-barcode');
     if (!barInput) return;
 
-    // Buat wrapper input + tombol scan kamera
     const wrap = document.createElement('div');
     wrap.style.cssText = 'display:flex; gap:8px; align-items:center; width:100%;';
     barInput.parentNode.insertBefore(wrap, barInput);
@@ -1167,7 +1109,6 @@ function openAddProductModal() {
     btnScan.innerHTML = '<i class="fa-solid fa-camera"></i> Scan';
     wrap.appendChild(btnScan);
 
-    // Wadah kamera scanner di bawah input barcode
     const camBox = document.createElement('div');
     camBox.id = 'modal-scanner-wrap';
     camBox.style.cssText = 'display:none; margin-top:8px; padding:10px; background:rgba(0,0,0,0.3); border-radius:12px; text-align:center; border:1px solid var(--glass-border);';
@@ -1178,12 +1119,23 @@ function openAddProductModal() {
     wrap.parentNode.appendChild(camBox);
 
     let modalScanner = null;
+    let modalScanHandled = false;
 
     const stopModalScanner = async () => {
-      if (modalScanner && modalScanner.isScanning) {
-        await modalScanner.stop();
-      }
+      try {
+        if (modalScanner && modalScanner.isScanning) {
+          await modalScanner.stop();
+        }
+      } catch (e) { /* abaikan */ }
       camBox.style.display = 'none';
+    };
+
+    const onModalScanSuccess = (decodedText) => {
+      if (modalScanHandled) return;
+      modalScanHandled = true;
+      barInput.value = String(decodedText || '').trim();
+      showNotification(`Barcode ${barInput.value} berhasil di-scan!`, 'success');
+      stopModalScanner();
     };
 
     btnScan.onclick = async () => {
@@ -1191,32 +1143,81 @@ function openAddProductModal() {
         showNotification('Library scanner belum siap. Cek koneksi internet.', 'error');
         return;
       }
+      if (modalScanner && modalScanner.isScanning) {
+        await stopModalScanner();
+        return;
+      }
+
+      modalScanHandled = false;
       camBox.style.display = 'block';
-      if (!modalScanner) modalScanner = new Html5Qrcode('modal-scanner-view');
+
+      if (!modalScanner) {
+        const formats = (typeof Html5QrcodeSupportedFormats !== 'undefined') ? [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.ITF,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ] : undefined;
+        modalScanner = new Html5Qrcode('modal-scanner-view', {
+          formatsToSupport: formats,
+          useBarCodeDetectorIfSupported: true,
+          verbose: false
+        });
+      }
+
+      const qrboxFn = (vw, vh) => ({
+        width: Math.max(160, Math.floor(vw * 0.85)),
+        height: Math.max(90, Math.floor(vh * 0.45))
+      });
 
       try {
         await modalScanner.start(
           { facingMode: 'environment' },
-          { fps: 10, qrbox: { width: 240, height: 140 } },
-          (decodedText) => {
-            barInput.value = String(decodedText).trim();
-            showNotification(`Barcode ${decodedText} berhasil di-scan!`, 'success');
-            stopModalScanner();
+          {
+            fps: 15,
+            qrbox: qrboxFn,
+            videoConstraints: {
+              facingMode: 'environment',
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+              focusMode: 'continuous'
+            }
           },
+          onModalScanSuccess,
           () => {}
         );
       } catch (err) {
-        console.error(err);
-        camBox.style.display = 'none';
-        showNotification('Gagal membuka kamera. Pastikan izin kamera aktif.', 'error');
+        try {
+          await modalScanner.start(
+            { facingMode: 'environment' },
+            { fps: 12, qrbox: qrboxFn },
+            onModalScanSuccess,
+            () => {}
+          );
+        } catch (err2) {
+          console.error(err2);
+          camBox.style.display = 'none';
+          showNotification('Gagal membuka kamera. Pastikan izin kamera aktif.', 'error');
+        }
       }
     };
 
     camBox.querySelector('#modal-scanner-close').onclick = stopModalScanner;
 
-    // Bersihkan kamera jika modal ditutup paksa
-    const cancelBtn = document.getElementById('fm-cancel');
-    if (cancelBtn) cancelBtn.addEventListener('click', stopModalScanner);
+    const modalEl = document.getElementById('custom-form-modal');
+    if (modalEl) {
+      const obs = new MutationObserver(() => {
+        if (!document.body.contains(modalEl)) {
+          obs.disconnect();
+          stopModalScanner();
+        }
+      });
+      obs.observe(document.body, { childList: true });
+    }
   }, 50);
 }
 
@@ -1259,8 +1260,6 @@ function deleteProduct(vouchId) {
   }, true);
 }
 
-// UI keranjang, pencarian, pembayaran, dan penyimpanan transaksi kasir ada di js/kasir.js
-// (data tetap disimpan per produk sebagai transaksi type 'voucher', jadi struktur database tidak berubah).
 function setupVoucherForm() {
   if (typeof setupKasirUi === 'function') setupKasirUi();
   else console.error('[Nexora] js/kasir.js belum termuat.');
@@ -1274,7 +1273,6 @@ function loadDashboardData() {
   const db = appData;
   const totalSaldo = db.accounts.reduce((sum, acc) => sum + Number(acc.balance || 0), 0);
 
-  // Pakai tanggal LOKAL (bukan UTC) supaya "hari ini" benar di WIB
   const todayKey = localDateKey(new Date());
   const monthKey = localMonthKey(new Date());
 
@@ -1289,13 +1287,13 @@ function loadDashboardData() {
   };
 
   setText('val-total-modal', formatRupiah(totalSaldo));
-  setText('val-omzet-today', formatRupiah(sumBy(todayTx, 'amount')));
-  // Komisi & fee = pendapatan; biaya admin Pindah Saldo = biaya. Pindah saldo sendiri BUKAN pendapatan.
+  setText('val-omzet-today', formatRupiah(sumBy(todayTx, 'admin_fee')));
+
   const fxDay = (typeof featureTotals === 'function') ? featureTotals('day') : { commission: 0, transferFee: 0 };
   const fxMonth = (typeof featureTotals === 'function') ? featureTotals('month') : { commission: 0, transferFee: 0 };
 
   setText('val-profit-today', formatRupiah(sumBy(todayTx, 'profit') + fxDay.commission - fxDay.transferFee));
-  setText('val-omzet-month', formatRupiah(sumBy(monthTx, 'amount')));
+  setText('val-omzet-month', formatRupiah(sumBy(monthTx, 'admin_fee')));
   setText('val-profit-month', formatRupiah(sumBy(monthTx, 'profit') + fxMonth.commission - fxMonth.transferFee));
   setText('val-commission-today', formatRupiah(fxDay.commission));
   setText('val-commission-month', formatRupiah(fxMonth.commission));
@@ -1328,7 +1326,6 @@ function renderRecentTransactions(transactions) {
   `).join('');
 }
 
-// Grafik omzet 7 hari terakhir (data nyata, sebelumnya angka contoh statis)
 function updateRevenueChart() {
   const canvas = document.getElementById('revenueChart');
   if (!canvas || typeof Chart === 'undefined') return;
@@ -1346,7 +1343,7 @@ function updateRevenueChart() {
   const totals = keys.map((key) =>
     appData.transactions
       .filter((tx) => localDateKey(tx.date) === key)
-      .reduce((sum, tx) => sum + Number(tx.amount || 0), 0)
+      .reduce((sum, tx) => sum + Number(tx.admin_fee || 0), 0)
   );
 
   if (revenueChart) {
@@ -1389,21 +1386,9 @@ function updateRevenueChart() {
 }
 
 // ==========================================
-// RIWAYAT TRANSAKSI
+// HAPUS TRANSAKSI
 // ==========================================
 
-// ------------------------------------------
-// FILTER TANGGAL RIWAYAT
-// Filter dijalankan di query Supabase (bukan sekadar menyembunyikan baris).
-// appData.transactions TIDAK diubah, karena dipakai dashboard, saldo, dan laporan.
-// Batas tanggal dihitung di zona waktu lokal pengguna lalu diubah ke ISO (UTC) untuk query,
-// sehingga cocok dengan nilai `date` yang disimpan lewat toISOString().
-// Rentang inklusif: >= 00:00:00 tanggal mulai dan < 00:00:00 hari setelah tanggal akhir
-// (setara sampai 23:59:59.999 tanggal akhir).
-// ------------------------------------------
-// (Filter tanggal, daftar, detail & edit Riwayat dipindah ke js/riwayat.js)
-
-// Hapus transaksi = batalkan efeknya (saldo dikembalikan, stok kembali, catatan hutang ikut dihapus)
 function deleteTransaction(txId) {
   const tx = appData.transactions.find((t) => String(t.id) === String(txId));
   if (!tx) return;
@@ -1415,7 +1400,6 @@ function deleteTransaction(txId) {
       const deltas = [{ accountId: tx.accountId, delta: Number(tx.amount || 0) }];
       const relatedPayments = appData.debtPayments.filter((p) => String(p.transactionId) === String(tx.id));
       if (relatedPayments.length > 0) {
-        // Uang yang sudah masuk lewat pembayaran hutang ditarik kembali dari rekening masing-masing
         relatedPayments.forEach((p) => deltas.push({ accountId: p.accountId, delta: -Number(p.amount || 0) }));
       } else if (tx.payAccountId && tx.payAccountId !== 'Hutang') {
         deltas.push({ accountId: tx.payAccountId, delta: -Number(tx.admin_fee || 0) });
@@ -1470,42 +1454,37 @@ function printSelectedReceipts() {
   printReceipts(ids);
 }
 
-
-// Struk tampil dulu di layar; dicetak saat tombol Cetak diklik (klik sendiri = pasti diizinkan browser)
 function showReceiptModal(html, list) {
   let m = document.getElementById('receipt-modal');
   if (!m) {
     m = document.createElement('div');
     m.id = 'receipt-modal';
     m.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px;gap:10px;';
-    // Cari baris ini di dalam fungsi showReceiptModal:
-  m.innerHTML = '<iframe id="receipt-frame" style="background:#fff;width:100%;max-width:340px;height:65vh;border:0;border-radius:10px;"></iframe>' +
-    '<div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;">' +
-      '<button id="receipt-wa" type="button" style="width:100%;padding:11px;border-radius:10px;border:0;background:#22c55e;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">' +
-        '<i class="fa-brands fa-whatsapp" style="font-size:16px;"></i> Kirim Struk WhatsApp' +
-      '</button>' +
-      '<div style="display:flex;gap:8px;width:100%;">' +
-        '<button id="receipt-close" type="button" style="flex:1;padding:11px;border-radius:10px;border:1px solid #444;background:#222;color:#fff;cursor:pointer;">Tutup</button>' +
-        '<button id="receipt-print" type="button" style="flex:1;padding:11px;border-radius:10px;border:0;background:#17A897;color:#fff;font-weight:700;cursor:pointer;">Cetak / PDF</button>' +
-      '</div>' +
-    '</div>';
-  document.body.appendChild(m);
-  m.querySelector('#receipt-close').onclick = () => m.remove();
+    m.innerHTML = '<iframe id="receipt-frame" style="background:#fff;width:100%;max-width:340px;height:65vh;border:0;border-radius:10px;"></iframe>' +
+      '<div style="display:flex;flex-direction:column;gap:8px;width:100%;max-width:340px;">' +
+        '<button id="receipt-wa" type="button" style="width:100%;padding:11px;border-radius:10px;border:0;background:#22c55e;color:#fff;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">' +
+          '<i class="fa-brands fa-whatsapp" style="font-size:16px;"></i> Kirim Struk WhatsApp' +
+        '</button>' +
+        '<div style="display:flex;gap:8px;width:100%;">' +
+          '<button id="receipt-close" type="button" style="flex:1;padding:11px;border-radius:10px;border:1px solid #444;background:#222;color:#fff;cursor:pointer;">Tutup</button>' +
+          '<button id="receipt-print" type="button" style="flex:1;padding:11px;border-radius:10px;border:0;background:#17A897;color:#fff;font-weight:700;cursor:pointer;">Cetak / PDF</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(m);
+    m.querySelector('#receipt-close').onclick = () => m.remove();
+  }
 
-  // Tambahkan listener ini tepat di bawah m.querySelector('#receipt-close'):
   const btnWa = m.querySelector('#receipt-wa');
   if (btnWa) {
     btnWa.onclick = () => {
-      const ids = (list || []).map(t => t.id);
+      const ids = (list || []).map((t) => t.id);
       if (window.NxWhatsApp) window.NxWhatsApp.sendReceiptWA(ids);
     };
-  }document.body.appendChild(m);
-    m.querySelector('#receipt-close').onclick = () => m.remove();
   }
+
   const frame = m.querySelector('#receipt-frame');
   frame.srcdoc = html;
 
-  // Area Bluetooth selalu tampil: berisi tombol, atau pesan penyebab yang tidak bisa dipakai
   let bt = m.querySelector('#receipt-bt');
   if (bt) bt.remove();
   bt = document.createElement('div');
@@ -1522,7 +1501,8 @@ function showReceiptModal(html, list) {
       '<button id="bt-print" type="button" style="flex:1;padding:10px;border-radius:10px;border:0;background:#2563eb;color:#fff;font-size:12px;font-weight:700;">Cetak Bluetooth</button></div>';
   }
   const btRow = m.querySelector('#receipt-close').parentElement;
-  m.insertBefore(bt, btRow);
+  btRow.parentElement.insertBefore(bt, btRow);
+
   const ctx = { biz: window.nxBiz || {}, br: (window.nxBiz || {}).branch || {}, names: window.nxStaffNames || {}, me: window.nxMe || {} };
   const bc = bt.querySelector('#bt-connect'), bp = bt.querySelector('#bt-print');
   if (bc) bc.onclick = async () => {
@@ -1564,9 +1544,7 @@ function printReceipts(ids) {
   const fmtDT = (d) => new Date(d).toLocaleString('en-GB', {
     timeZone: 'Asia/Jakarta', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false
   });
-  // admin_fee = harga jual yang dibayar pelanggan (dasar omzet). amount = modal internal, TIDAK ditampilkan.
   const totalBayar = list.reduce((s, tx) => s + Number(tx.admin_fee || 0), 0);
-  const allLunas = list.every((tx) => tx.status !== 'Hutang');
   const branchLine = [br.name, br.code ? '(' + br.code + ')' : ''].filter(Boolean).join(' ');
 
   const row = (label, value, cls) =>
@@ -1676,7 +1654,6 @@ function exportTransactionsExcel(mode) {
       'Total': Number(tx.admin_fee || 0),
       'Modal': Number(tx.cost_price !== null && tx.cost_price !== undefined ? tx.cost_price : tx.amount || 0),
       'Keuntungan': Number(tx.profit || 0),
-      // Kolom tambahan Tarik Tunai (kosong untuk transaksi lain)
       ...(typeof tarikTunaiExportFields === 'function' ? tarikTunaiExportFields(tx) : {})
     };
   });
@@ -1710,7 +1687,6 @@ function paidForDebt(debt) {
     .reduce((sum, p) => sum + Number(p.amount || 0), 0);
 }
 
-// Kelompokkan hutang per pelanggan (nama tidak peka huruf besar/kecil), hutang terlama di atas
 function groupDebtsByCustomer() {
   const map = new Map();
   [...appData.debts]
@@ -1770,7 +1746,6 @@ function loadDebtsPage() {
     `).join('');
   }
 
-  // Riwayat pembayaran terakhir
   const history = [...appData.debtPayments].sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, 10);
   if (history.length > 0) {
     html += '<h5 class="debt-history-title">Riwayat Pembayaran Hutang</h5>';
@@ -1790,8 +1765,6 @@ function loadDebtsPage() {
   listEl.innerHTML = html;
 }
 
-// Bayar hutang (boleh sebagian). Nominal dialokasikan ke hutang TERLAMA dulu.
-// Contoh: Joko hutang 50.000, bayar 30.000 -> sisa 20.000.
 function openPayDebtModal(customerKey) {
   const group = groupDebtsByCustomer().find((g) => g.key === customerKey);
   if (!group) return;
@@ -1834,7 +1807,7 @@ function openPayDebtModal(customerKey) {
       const ops = [];
       const newPayments = [];
       const removedDebtIds = [];
-      const reducedDebts = []; // { debt, newAmount }
+      const reducedDebts = [];
       const settledTxs = [];
       let left = v.amount;
 
@@ -2176,6 +2149,7 @@ function deleteCustomer(customerId) {
     showNotification('Pelanggan dihapus!', 'success');
   }, true);
 }
+
 // ==========================================
 // POP-UP PROMO PAKET HARGA CORET VIA WHATSAPP
 // ==========================================
@@ -2183,33 +2157,32 @@ function openSubscriptionUpgradeModal() {
   const me = window.nxMe || {};
   const biz = window.nxBiz || {};
 
-  // Daftar paket promo mandiri (tidak akan pernah kosong meskipun cache lama)
   const packages = (window.NexoraAuth && window.NexoraAuth.PRICING_PACKAGES && window.NexoraAuth.PRICING_PACKAGES.length)
     ? window.NexoraAuth.PRICING_PACKAGES
     : [
-        { 
-          name: 'Paket Bulanan (1 Bulan)', 
-          days: 30, 
-          originalPrice: 'Rp 49.000', 
-          price: 'Rp 34.999', 
-          label: '1 Bulan Penuh', 
-          badge: 'Diskon 30%' 
+        {
+          name: 'Paket Bulanan (1 Bulan)',
+          days: 30,
+          originalPrice: 'Rp 49.000',
+          price: 'Rp 34.999',
+          label: '1 Bulan Penuh',
+          badge: 'Diskon 30%'
         },
-        { 
-          name: 'Paket Hemat (6 Bulan)', 
-          days: 180, 
-          originalPrice: 'Rp 294.000', 
-          price: 'Rp 179.999', 
-          label: '6 Bulan Hemat', 
-          badge: 'Hemat 40%' 
+        {
+          name: 'Paket Hemat (6 Bulan)',
+          days: 180,
+          originalPrice: 'Rp 294.000',
+          price: 'Rp 179.999',
+          label: '6 Bulan Hemat',
+          badge: 'Hemat 40%'
         },
-        { 
-          name: 'Paket Tahunan (1 Tahun)', 
-          days: 365, 
-          originalPrice: 'Rp 588.000', 
-          price: 'Rp 299.999', 
-          label: '1 Tahun (Paling Laris)', 
-          badge: 'Super Hemat 50%' 
+        {
+          name: 'Paket Tahunan (1 Tahun)',
+          days: 365,
+          originalPrice: 'Rp 588.000',
+          price: 'Rp 299.999',
+          label: '1 Tahun (Paling Laris)',
+          badge: 'Super Hemat 50%'
         }
       ];
 
@@ -2258,7 +2231,6 @@ function checkoutViaWA(pkgName, price) {
   const bizName = biz.name || me.branch_name || 'Bisnis Saya';
   const username = me.username || me.full_name || '-';
 
-  // Format pesan WA otomatis
   const msg = `Halo Admin Nexora, saya ingin ambil PROMO perpanjang aplikasi kasir:\n\n` +
     `*Nama Bisnis:* ${bizName}\n` +
     `*Username Akun:* @${username}\n` +
@@ -2268,7 +2240,8 @@ function checkoutViaWA(pkgName, price) {
 
   const url = `https://api.whatsapp.com/send?phone=${wa}&text=${encodeURIComponent(msg)}`;
   removeModal('sub-upgrade-modal');
-  window.open(url, '_blank');
+  const win = window.open(url, '_blank');
+  if (!win) window.location.href = url;
 }
 
 window.openSubscriptionUpgradeModal = openSubscriptionUpgradeModal;
