@@ -1,19 +1,12 @@
-
 // Nama pembuat transaksi (username), dari fungsi nx_staff_names (diisi di app.js)
 function staffLabel(uid) {
   const m = window.nxStaffNames || {};
   const name = m[String(uid)];
   return name || '-';
 }
+
 // ==========================================
-// NEXORA - MENU RIWAYAT (v2.4)
-//   - Default tampilan = transaksi HARI INI (WIB / Asia Jakarta), filter dijalankan di Supabase
-//   - Filter tanggal, jenis, status + pencarian (bisa dipakai bersamaan)
-//   - Kartu ringkas (keterangan maks. 2 baris), tombol Detail, Edit, Struk, Hapus
-//   - Edit transaksi: saldo, kas, keuntungan disinkronkan atomik lewat fungsi database
-//     nx_edit_transaction (sql/nexora_riwayat_edit.sql)
-//
-// Dimuat SETELAH app.js, features.js, tarik-tunai.js. Menggantikan blok Riwayat lama di app.js.
+// NEXORA - MENU RIWAYAT (v2.6)
 // ==========================================
 console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
 (function () {
@@ -24,7 +17,7 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
   const rp = (v) => formatRupiah(v);
   const PAGE_STEP = 50;
   const TZ = 'Asia/Jakarta';
-  const WIB_OFFSET_MS = 7 * 3600 * 1000; // WIB = UTC+7 (tanpa DST)
+  const WIB_OFFSET_MS = 7 * 3600 * 1000;
 
   // ------------------------------------------
   // TANGGAL WIB
@@ -33,7 +26,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     const d = new Date((ms === undefined ? Date.now() : ms) + WIB_OFFSET_MS);
     return { y: d.getUTCFullYear(), m: d.getUTCMonth(), d: d.getUTCDate() };
   }
-  // Awal hari WIB (00:00 WIB) sebagai objek Date. Date.UTC otomatis merapikan hari/bulan yang melebihi.
   function wibStart(y, m, d) { return new Date(Date.UTC(y, m, d) - WIB_OFFSET_MS); }
   function wibDayKey(ms) {
     const p = wibParts(ms);
@@ -64,8 +56,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     thisMonth: 'Bulan ini', lastMonth: 'Bulan lalu', custom: 'Tanggal sendiri'
   };
 
-  // { start, endExcl } (Date) untuk preset; null = semua. Dihitung ulang setiap query,
-  // jadi pergantian hari (00:00 WIB) otomatis ikut.
   function getRange() {
     const p = S.preset;
     if (p === 'all') return null;
@@ -93,13 +83,13 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
   // STATE
   // ------------------------------------------
   const S = {
-    preset: 'today',          // DEFAULT: hari ini
+    preset: 'today',
     customStart: null,
     customEndExcl: null,
-    type: 'all',              // all | tarik | setor | pindah | ppob | kasir | layanan
+    type: 'all',
     status: 'all',
     search: '',
-    txRows: null,             // hasil query Supabase untuk rentang (null = belum dimuat / mode semua)
+    txRows: null,
     trfRows: null,
     loading: false,
     error: false,
@@ -147,11 +137,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     if (status === 'Success' || status === undefined || status === null || status === '') return 'Berhasil';
     return String(status);
   }
-  function statusClass(label) {
-    if (label === 'Berhasil') return 'st-ok';
-    if (label === 'Hutang') return 'st-debt';
-    return 'st-other';
-  }
 
   function accName(id) {
     if (id === 'Hutang') return 'Hutang';
@@ -175,7 +160,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       (appData.debtPayments || []).some((p) => String(p.transactionId) === String(tx.id));
   }
 
-  // Satukan transaksi + pindah saldo menjadi satu daftar
   function buildEntries() {
     const filtered = S.preset !== 'all';
     const txs = filtered ? (S.txRows || []) : (appData.transactions || []);
@@ -211,16 +195,14 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
   }
 
   // ------------------------------------------
-  // QUERY SUPABASE (filter tanggal di server)
+  // QUERY SUPABASE
   // ------------------------------------------
-  async function fetchRange(table, start, endExcl, withUser) {
+  async function fetchRange(table, start, endExcl) {
     const size = 1000;
     let from = 0;
     let all = [];
     for (;;) {
       let q = sb.from(table).select('*');
-      // Data dibatasi per CABANG oleh aturan akses di database (RLS), bukan per user,
-      // supaya karyawan melihat riwayat seluruh cabangnya.
       q = q.gte('date', start.toISOString()).lt('date', endExcl.toISOString())
         .order('date', { ascending: false }).order('id', { ascending: false })
         .range(from, from + size - 1);
@@ -242,18 +224,17 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       renderFilterUi(); render();
       return;
     }
-    const seq = ++S.seq; // abaikan hasil query lama bila filter sudah berganti
+    const seq = ++S.seq;
     S.loading = true;
     renderFilterUi(); render();
 
     try {
-      const txRes = await fetchRange('transactions', range.start, range.endExcl, true);
+      const txRes = await fetchRange('transactions', range.start, range.endExcl);
       if (seq !== S.seq) return;
       if (txRes.error) throw txRes.error;
-      // Pindah Saldo: tabel terpisah. Jika belum ada, Riwayat transaksi tetap tampil.
       let trf = [];
       try {
-        const trfRes = await fetchRange('balance_transfers', range.start, range.endExcl, false);
+        const trfRes = await fetchRange('balance_transfers', range.start, range.endExcl);
         if (seq !== S.seq) return;
         if (!trfRes.error) trf = trfRes.data || [];
       } catch (e) { /* abaikan */ }
@@ -298,7 +279,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       } else {
         textEl.textContent = `${PRESET_LABELS[S.preset]} (${periodText(range)}) \u00b7 WIB`;
       }
-      // tombol reset hanya berguna jika bukan default
       const clear = $('btn-tx-filter-clear');
       if (clear) clear.hidden = S.preset === 'today';
       activeEl.hidden = false;
@@ -359,7 +339,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     runFilter();
   }
 
-  // Reset = kembali ke tampilan awal (hari ini)
   function resetFilters() {
     S.seq++;
     S.preset = 'today';
@@ -382,7 +361,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     const status = entryStatus(e);
     const debtBadge = status === 'Hutang' ? ' <span class="badge-debt">Hutang</span>' : '';
 
-  
     const actions = (printable) => `
       <div class="tx-action-btns">
         <button type="button" class="btn-detail" data-act="detail" title="Detail"><i class="fa-solid fa-eye"></i></button>
@@ -479,7 +457,7 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
   function detailRows(e) {
     const rows = [];
     const add = (k, v, cls) => {
-      if (v === null || v === undefined || v === '' || v === '-') return; // jangan tampilkan kolom kosong
+      if (v === null || v === undefined || v === '' || v === '-') return;
       rows.push({ k, v: String(v), cls: cls || '' });
     };
 
@@ -517,7 +495,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       add('Sumber Modal', accName(tx.accountId));
       if (num(tx.quantity) > 0) add('Jumlah Barang', String(tx.quantity));
       add('Total Bayar', rp(tx.admin_fee));
-      if (tx.type === 'tarik_setor') add('Biaya Admin', rp(Number(tx.admin_fee || 0) - Number(tx.amount || 0)));
       add('Modal', rp(tx.cost_price !== null && tx.cost_price !== undefined ? tx.cost_price : tx.amount));
     } else {
       add('Aplikasi Pengirim', accName(tx.accountId));
@@ -552,7 +529,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
   // ------------------------------------------
   // EDIT
   // ------------------------------------------
-  // Promise<boolean>: true bila pengguna menekan "Ya, Lanjutkan"; false untuk Batal / tutup dialog
   function confirmAsync(title, message) {
     return new Promise((resolve) => {
       let done = false;
@@ -570,7 +546,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     return head.concat((appData.accounts || []).map((a) => ({ value: String(a.id), label: `${a.name} - Saldo: ${rp(a.balance)}` })));
   }
 
-  // Dampak saldo sebuah transaksi (sama dengan saat dibuat): sumber -amount, penerima +admin_fee
   function balanceEffects(src, pay, amount, fee) {
     const m = new Map();
     const add = (id, d) => { if (id && id !== 'Hutang') m.set(String(id), (m.get(String(id)) || 0) + d); };
@@ -579,7 +554,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     return m;
   }
 
-  // Selisih saldo = dampak baru - dampak lama (yang akan benar-benar diubah di database)
   function diffEffects(oldTx, next) {
     const oldE = balanceEffects(oldTx.accountId, oldTx.payAccountId, oldTx.amount, oldTx.admin_fee);
     const newE = balanceEffects(next.src, next.pay, next.amount, next.fee);
@@ -597,7 +571,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       .map(([id, d]) => `${accName(id)} ${d > 0 ? '+' : '-'}${rp(Math.abs(d))}`).join(', ') + '.';
   }
 
-  // Peringatan (bukan blokir) bila hasil edit membuat saldo minus - sama seperti saat input transaksi
   async function confirmNegative(diff) {
     for (const [id, d] of diff.entries()) {
       if (d >= 0) continue;
@@ -621,12 +594,11 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       }
       return false;
     }
-    await fetchCloudData();   // muat ulang transaksi + saldo dari server (sumber kebenaran)
+    await fetchCloudData();
     refreshAllViews();
     return true;
   }
 
-  // Validasi langsung di modal edit: tampilkan pesan, matikan tombol simpan
   function wireEditGuard(getMessage) {
     const modal = document.getElementById('custom-form-modal');
     if (!modal) return;
@@ -657,7 +629,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     return openEditGeneric(tx);
   }
 
-  // --- Kasir / Hutang: hanya tanggal & keterangan ---
   function openEditLimited(tx) {
     showFormModal({
       title: 'Edit Transaksi',
@@ -677,7 +648,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     });
   }
 
-  // --- Tarik Tunai (Admin Luar / Admin Dalam) ---
   function openEditTarikTunai(tx) {
     const info = tarikInfo(tx);
     const rawNotes = String(tx.notes || '');
@@ -708,7 +678,7 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
         const cash = findAccount(v.cash);
         if (!recv || !cash) { showNotification('Akun penerima / kas fisik tidak ditemukan.', 'error'); return false; }
 
-        const c = calcTarikTunai(f.nominal, f.admin, f.type);   // hitung ulang semua komponen
+        const c = calcTarikTunai(f.nominal, f.admin, f.type);
         if (c.cash < 0 || c.received <= 0 || c.profit < 0) { showNotification('Perhitungan tidak valid. Periksa nominal dan biaya admin.', 'error'); return false; }
 
         const diff = diffEffects(tx, { src: cash.id, pay: recv.id, amount: c.cash, fee: c.received });
@@ -747,7 +717,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     });
   }
 
-  // --- Tarik/Setor lain & PPOB: akun sumber, penerima, modal, harga jual ---
   function openEditGeneric(tx) {
     const isPpob = tx.type === 'ppob';
     const oldSrcName = accName(tx.accountId);
@@ -777,7 +746,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
           `Modal ${rp(v.modal)}, harga jual ${rp(v.jual)}, untung ${rp(profit)}. ${effectsText(diff)} Lanjutkan?`);
         if (!ok0) return false;
 
-        // Nama aplikasi sumber di keterangan otomatis ikut diganti bila akun sumber diubah
         let notes = v.notes;
         if (!isPpob && oldSrcName !== '-' && String(src.id) !== String(tx.accountId)) {
           notes = notes.split(`(${oldSrcName})`).join(`(${src.name})`);
@@ -801,8 +769,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     });
   }
 
-
-  // Gaya Riwayat disisipkan lewat JS (tidak bergantung cache style.css)
   function injectStyles() {
     if (document.getElementById('nx-history-style')) return;
     const st = document.createElement('style');
@@ -813,7 +779,6 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
       .tx-more { width: 100%; justify-content: center; margin: 12px 0 16px; font-size: 12px; }
       .tx-more[hidden] { display: none; }
       .tx-check-spacer { display: inline-block; width: 14px; }
-      /* Keterangan dipendekkan: maksimal 2 baris, sisanya "..." (teks asli tetap di database & Detail) */
       .tx-ket { width: 220px; max-width: 220px; white-space: normal; line-height: 1.4; font-size: 12px;
         display: -webkit-box; -webkit-line-clamp: 2; line-clamp: 2; -webkit-box-orient: vertical;
         overflow: hidden; overflow-wrap: anywhere; word-break: break-word; }
@@ -877,8 +842,8 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
           break;
         default: break;
       }
+    });
 
-    // Ganti hari (00:00 WIB) -> filter relatif (Hari ini, Kemarin, ...) otomatis diperbarui
     const checkRollover = () => {
       const key = wibDayKey();
       if (key === S.dayKey) return;
@@ -893,13 +858,10 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
     document.addEventListener('visibilitychange', () => { if (!document.hidden) checkRollover(); });
   }
 
-  // ------------------------------------------
-  // PENDAFTARAN KE APLIKASI
-  // ------------------------------------------
   function loadPage() {
     renderFilterUi();
     if (S.preset === 'all') render();
-    else runFilter();   // selalu muat ulang dari database (mis. setelah tambah / edit / hapus)
+    else runFilter();
   }
 
   window.loadTransactionsPage = loadPage;
@@ -910,6 +872,5 @@ console.info('[Nexora] riwayat.js v2.6 (tabel + keterangan 2 baris)');
 
   document.addEventListener('DOMContentLoaded', bind);
 
-  // Dipakai pengujian
   window.NxHistory = { wibStart, wibDayKey, getRange, txCategory, diffEffects, state: S };
 })();
