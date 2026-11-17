@@ -203,6 +203,10 @@
     window.scrollTo(0, 0);
   }
 
+  function postInjectModalSaldo(lines) {
+    return lines.reduce((s, l) => s + (l.v.prepaid ? 0 : Number(l.v.modal_saldo || 0) * l.qty), 0);
+  }
+
   function showPay() {
     const lines = getLines();
     if (lines.length === 0) {
@@ -211,6 +215,9 @@
     }
     setSelectOptions($('vouch-pay-method'), accountOptions('-- Pilih Pembayaran --', true));
     setSelectOptions($('vouch-select-account'), accountOptions('-- Pilih Akun / Sumber Modal (Inject) --'));
+
+    const accGroup = $('vouch-select-account') && $('vouch-select-account').closest('.form-group');
+    if (accGroup) accGroup.style.display = postInjectModalSaldo(lines) > 0 ? '' : 'none';
 
     $(CART_VIEW).hidden = true;
     $(PAY_VIEW).hidden = false;
@@ -319,11 +326,13 @@
       return;
     }
 
+    const totalPostInjectSaldo = postInjectModalSaldo(lines);
+    const needInjectAccount = totalPostInjectSaldo > 0;
     const accountId = $('vouch-select-account').value;
     const payMethod = $('vouch-pay-method').value;
     const customerName = $('vouch-customer-name').value.trim();
 
-    if (!accountId || !payMethod) {
+    if (!payMethod || (needInjectAccount && !accountId)) {
       showNotification('Lengkapi metode pembayaran dan akun sumber modal!', 'error');
       return;
     }
@@ -333,9 +342,9 @@
       return;
     }
 
-    const accInject = findAccount(accountId);
+    const accInject = needInjectAccount ? findAccount(accountId) : null;
     const receiver = findAccount(payMethod);
-    if (!accInject || (!isDebt && !receiver)) {
+    if ((needInjectAccount && !accInject) || (!isDebt && !receiver)) {
       showNotification('Produk atau akun tidak ditemukan!', 'error');
       return;
     }
@@ -368,13 +377,13 @@
       txDate = picked.toISOString();
     }
 
-    const totalModalSaldo = lines.reduce((s, l) => s + Number(l.v.modal_saldo || 0) * l.qty, 0);
-    if (!(await confirmLowBalance(accInject, totalModalSaldo))) return;
+    if (needInjectAccount && !(await confirmLowBalance(accInject, totalPostInjectSaldo))) return;
 
     let remaining = totalDisc;
     const txs = [];
     const debts = [];
     const stockUpdates = [];
+    const fallbackAccountId = receiver ? String(receiver.id) : (appData.accounts[0] ? String(appData.accounts[0].id) : '');
 
     lines.forEach((l, i) => {
       const isLast = i === lines.length - 1;
@@ -383,10 +392,12 @@
       remaining -= lineDisc;
 
       const net = l.sell - lineDisc;
+      const isPrepaid = !!l.v.prepaid;
       const modalSaldo = Number(l.v.modal_saldo || 0) * l.qty;
       const modalFisik = Number(l.v.modal_fisik || 0) * l.qty;
+      const deductAtSale = isPrepaid ? 0 : modalSaldo;
 
-      let notes = `Kasir: ${l.v.name} (${l.qty} pcs) via ${accInject.name}`;
+      let notes = `Kasir: ${l.v.name} (${l.qty} pcs)` + (isPrepaid ? ' [Stok Inject]' : ` via ${accInject.name}`);
       if (lineDisc > 0) notes += ` | Diskon ${formatRupiah(lineDisc)}`;
       if (customerName && !isDebt) notes += ` | Pelanggan: ${customerName}`;
 
@@ -397,13 +408,13 @@
         id: txId,
         user_id: currentUserId,
         type: 'voucher',
-        accountId: String(accInject.id),
+        accountId: isPrepaid ? fallbackAccountId : String(accInject.id),
         payAccountId: receiver ? String(receiver.id) : 'Hutang',
         voucherId: String(l.v.id),
         quantity: l.qty,
         debtId,
         notes,
-        amount: modalSaldo,
+        amount: deductAtSale,
         admin_fee: net,
         cost_price: modalSaldo + modalFisik,
         profit: net - (modalSaldo + modalFisik),
@@ -420,7 +431,8 @@
       stockUpdates.push({ v: l.v, newStock: l.stock - l.qty });
     });
 
-    const deltas = [{ accountId: accInject.id, delta: -totalModalSaldo }];
+    const deltas = [];
+    if (needInjectAccount && accInject) deltas.push({ accountId: accInject.id, delta: -totalPostInjectSaldo });
     if (receiver) deltas.push({ accountId: receiver.id, delta: total });
     const { ops: balanceOps, applies } = buildAccountOps(deltas);
 

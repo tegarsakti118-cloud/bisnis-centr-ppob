@@ -1036,10 +1036,14 @@ function initVoucherPage() {
     return;
   }
 
-  listEl.innerHTML = vouchers.map((v) => `
+  listEl.innerHTML = vouchers.map((v) => {
+    const modeBadge = v.prepaid
+      ? '<span style="font-size:10px; padding:1px 6px; border-radius:999px; background:rgba(52,211,153,0.15); color:#34d399; border:1px solid rgba(52,211,153,0.35);">Inject Awal</span>'
+      : '<span style="font-size:10px; padding:1px 6px; border-radius:999px; background:rgba(56,189,248,0.15); color:#38bdf8; border:1px solid rgba(56,189,248,0.35);">Tembak Saat Laku</span>';
+    return `
     <div class="row-item">
       <div>
-        <strong style="font-size:14px; display:block;">${escapeHtml(v.name)}</strong>
+        <strong style="font-size:14px; display:block;">${escapeHtml(v.name)} ${modeBadge}</strong>
         <span style="font-size:11px; color:var(--text-muted);">Modal Saldo: ${formatRupiah(v.modal_saldo)} | Modal Fisik: ${formatRupiah(v.modal_fisik)}</span>
       </div>
       <div style="display:flex; align-items:center; gap:8px;">
@@ -1054,8 +1058,28 @@ function initVoucherPage() {
           <i class="fa-solid fa-trash-can"></i>
         </button>` : ''}
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
+}
+
+function stockAccountSelectOptions(emptyLabel) {
+  return [{ value: '', label: emptyLabel }].concat(
+    appData.accounts.map((a) => ({ value: String(a.id), label: `${a.name} - Saldo: ${formatRupiah(a.balance)}` }))
+  );
+}
+
+async function confirmDeltasBalance(deltas) {
+  const map = new Map();
+  deltas.forEach((d) => {
+    if (!d.accountId || d.delta >= 0) return;
+    const k = String(d.accountId);
+    map.set(k, (map.get(k) || 0) + Math.abs(Number(d.delta || 0)));
+  });
+  for (const [accId, needed] of map.entries()) {
+    const acc = findAccount(accId);
+    if (!(await confirmLowBalance(acc, needed))) return false;
+  }
+  return true;
 }
 
 function openAddProductModal(prefill) {
@@ -1069,12 +1093,38 @@ function openAddProductModal(prefill) {
     fields: [
       { id: 'name', label: 'Nama Produk / Barang', type: 'text', required: true, value: isBarcode ? '' : rawPrefill, placeholder: 'Contoh: Telkomsel 7GB / Teh Botol' },
       { id: 'barcode', label: 'Barcode / Kode Barang (Opsional)', type: 'text', value: isBarcode ? rawPrefill : '', placeholder: 'Ketik atau klik tombol scan di samping' },
-      { id: 'modal_saldo', label: 'Modal Saldo / Inject Server (Rp)', type: 'number', required: true, allowZero: true, value: '0' },
-      { id: 'modal_fisik', label: 'Modal Barang Fisik (Rp)', type: 'number', required: true, allowZero: true, value: '0' },
+      {
+        id: 'prepaid',
+        label: 'Cara Potong Saldo Modal',
+        type: 'select',
+        value: '1',
+        options: [
+          { value: '1', label: 'Potong saldo sekarang saat isi stok (Inject Awal)' },
+          { value: '0', label: 'Potong saldo nanti saat terjual di Kasir (Tembak Saat Laku)' }
+        ]
+      },
+      { id: 'modal_saldo', label: 'Modal Saldo / Inject Server per pcs (Rp)', type: 'number', required: true, allowZero: true, value: '0' },
+      { id: 'saldo_account', label: 'Potong Modal Saldo dari Rekening', type: 'select', value: '', options: stockAccountSelectOptions('-- Tidak potong saldo --') },
+      { id: 'modal_fisik', label: 'Modal Fisik / Kartu Kosong per pcs (Rp, boleh 0)', type: 'number', required: true, allowZero: true, value: '0' },
+      { id: 'fisik_account', label: 'Potong Modal Fisik dari Rekening', type: 'select', value: '', options: stockAccountSelectOptions('-- Tidak potong saldo (0 / sudah dibayar) --') },
       { id: 'price', label: 'Harga Jual ke Pelanggan (Rp)', type: 'number', required: true },
       { id: 'stock', label: 'Jumlah Stok Awal', type: 'number', required: true, allowZero: true, value: '10' }
     ],
     onSubmit: async (v) => {
+      const isPrepaid = v.prepaid === '1';
+      const deltas = [];
+      if (isPrepaid && v.stock > 0) {
+        if (v.modal_saldo > 0 && v.saldo_account) {
+          deltas.push({ accountId: v.saldo_account, delta: -(v.modal_saldo * v.stock) });
+        }
+        if (v.modal_fisik > 0 && v.fisik_account) {
+          deltas.push({ accountId: v.fisik_account, delta: -(v.modal_fisik * v.stock) });
+        }
+      }
+
+      if (!(await confirmDeltasBalance(deltas))) return false;
+
+      const { ops: balanceOps, applies } = buildAccountOps(deltas);
       const newVoucher = {
         id: genId('vouch'),
         user_id: currentUserId,
@@ -1083,17 +1133,40 @@ function openAddProductModal(prefill) {
         modal_saldo: v.modal_saldo,
         modal_fisik: v.modal_fisik,
         price: v.price,
-        stock: v.stock
+        stock: v.stock,
+        prepaid: isPrepaid
       };
-      const ok = await runOps([['vouchers', newVoucher, 'insert']]);
+
+      const ok = await runOps(
+        [['vouchers', newVoucher, 'insert'], ...balanceOps],
+        { kind: 'inject_stok', note: `Stok awal ${v.name} (${v.stock} pcs)` }
+      );
       if (!ok) return false;
+
+      try { await sb.rpc('nx_set_voucher_prepaid', { p_id: newVoucher.id, p_prepaid: isPrepaid }); } catch (e) { /* abaikan */ }
+
       appData.vouchers.push(newVoucher);
-      initVoucherPage();
+      applies.forEach((fn) => fn());
+      refreshAllViews();
       showNotification('Produk kasir berhasil ditambahkan!', 'success');
     }
   });
 
   setTimeout(() => {
+    const prepaidSel = document.getElementById('fm-prepaid');
+    const saldoAccWrap = document.getElementById('fm-saldo_account')?.closest('.form-group');
+    const fisikAccWrap = document.getElementById('fm-fisik_account')?.closest('.form-group');
+    const modalFisikInput = document.getElementById('fm-modal_fisik');
+    const syncAccountFields = () => {
+      const on = prepaidSel && prepaidSel.value === '1';
+      if (saldoAccWrap) saldoAccWrap.style.display = on ? '' : 'none';
+      const hasFisik = modalFisikInput && parseMoney(modalFisikInput.value) > 0;
+      if (fisikAccWrap) fisikAccWrap.style.display = (on && hasFisik) ? '' : 'none';
+    };
+    if (prepaidSel) prepaidSel.addEventListener('change', syncAccountFields);
+    if (modalFisikInput) modalFisikInput.addEventListener('input', syncAccountFields);
+    syncAccountFields();
+
     const barInput = document.getElementById('fm-barcode');
     if (!barInput) return;
 
@@ -1225,28 +1298,88 @@ function updateStock(vouchId) {
   const vouch = appData.vouchers.find((v) => String(v.id) === String(vouchId));
   if (!vouch) return;
 
+  const modalSaldo = Number(vouch.modal_saldo || 0);
+  const modalFisik = Number(vouch.modal_fisik || 0);
+
+  const fields = [
+    {
+      id: 'mode', label: `Aksi untuk "${vouch.name}" (stok sekarang: ${vouch.stock})`, type: 'select',
+      options: [{ value: 'add', label: 'Tambah stok' }, { value: 'sub', label: 'Kurangi stok' }], value: 'add'
+    },
+    { id: 'qty', label: 'Jumlah (pcs)', type: 'number', required: true }
+  ];
+
+  if (modalSaldo > 0) {
+    fields.push({
+      id: 'saldo_account',
+      label: `Potong Modal Saldo (${formatRupiah(modalSaldo)}/pcs) dari`,
+      type: 'select',
+      value: '',
+      options: stockAccountSelectOptions(vouch.prepaid ? '-- Tidak potong saldo --' : '-- Tidak potong (Tembak Saat Laku) --')
+    });
+  }
+  if (modalFisik > 0) {
+    fields.push({
+      id: 'fisik_account',
+      label: `Potong Modal Fisik (${formatRupiah(modalFisik)}/pcs) dari`,
+      type: 'select',
+      value: '',
+      options: stockAccountSelectOptions('-- Tidak potong saldo --')
+    });
+  }
+
   showFormModal({
     title: 'Ubah Stok Barang',
     icon: 'fa-solid fa-boxes-stacked',
-    fields: [
-      {
-        id: 'mode', label: `Aksi untuk "${vouch.name}" (stok sekarang: ${vouch.stock})`, type: 'select',
-        options: [{ value: 'add', label: 'Tambah stok' }, { value: 'sub', label: 'Kurangi stok' }], value: 'add'
-      },
-      { id: 'qty', label: 'Jumlah (pcs)', type: 'number', required: true }
-    ],
+    fields,
     onSubmit: async (v) => {
       let newStock = Number(vouch.stock || 0) + (v.mode === 'add' ? v.qty : -v.qty);
       if (newStock < 0) newStock = 0;
-      const ok = await runOps([['vouchers', { stock: newStock }, 'update', vouch.id]]);
+
+      const deltas = [];
+      if (v.mode === 'add' && v.qty > 0) {
+        if (modalSaldo > 0 && v.saldo_account) {
+          deltas.push({ accountId: v.saldo_account, delta: -(modalSaldo * v.qty) });
+        }
+        if (modalFisik > 0 && v.fisik_account) {
+          deltas.push({ accountId: v.fisik_account, delta: -(modalFisik * v.qty) });
+        }
+      }
+
+      if (!(await confirmDeltasBalance(deltas))) return false;
+
+      const { ops: balanceOps, applies } = buildAccountOps(deltas);
+      const ok = await runOps(
+        [['vouchers', { stock: newStock }, 'update', vouch.id], ...balanceOps],
+        { kind: 'inject_stok', note: `${v.mode === 'add' ? 'Tambah' : 'Kurangi'} stok ${vouch.name} (${v.qty} pcs)` }
+      );
       if (!ok) return false;
+
+      if (deltas.length > 0 && !vouch.prepaid) {
+        vouch.prepaid = true;
+        try { await sb.rpc('nx_set_voucher_prepaid', { p_id: String(vouch.id), p_prepaid: true }); } catch (e) { /* abaikan */ }
+      }
+
       vouch.stock = newStock;
-      initVoucherPage();
+      applies.forEach((fn) => fn());
+      refreshAllViews();
       showNotification(`Stok ${vouch.name} berhasil diperbarui!`, 'success');
     }
   });
-}
 
+  setTimeout(() => {
+    const modeSel = document.getElementById('fm-mode');
+    const saldoWrap = document.getElementById('fm-saldo_account')?.closest('.form-group');
+    const fisikWrap = document.getElementById('fm-fisik_account')?.closest('.form-group');
+    const sync = () => {
+      const isAdd = !modeSel || modeSel.value === 'add';
+      if (saldoWrap) saldoWrap.style.display = isAdd ? '' : 'none';
+      if (fisikWrap) fisikWrap.style.display = isAdd ? '' : 'none';
+    };
+    if (modeSel) modeSel.addEventListener('change', sync);
+    sync();
+  }, 30);
+}
 function deleteProduct(vouchId) {
   const vouch = appData.vouchers.find((v) => String(v.id) === String(vouchId));
   if (!vouch) return;
